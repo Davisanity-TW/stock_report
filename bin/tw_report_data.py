@@ -90,11 +90,8 @@ def twse_stock_day(gdate: dt.date, code: str):
             row = r
             break
     if row is None:
-        # fallback last row
-        if j.get("data"):
-            row = j["data"][-1]
-        else:
-            raise RuntimeError(f"TWSE STOCK_DAY empty for {code}")
+        # No row for the target date → treat as missing for this data day.
+        raise RuntimeError(f"TWSE STOCK_DAY missing for {code} on {gdate.isoformat()}")
 
     shares = to_int(row[1])
     close = to_float(row[6])
@@ -122,7 +119,8 @@ def twse_t86(gdate: dt.date):
     )
     j = http_get_json(url)
     if j.get("stat") != "OK":
-        raise RuntimeError(f"TWSE T86 not OK: {j.get('stat')}")
+        # Common on non-trading days / before data is published.
+        return {}
     idx = {name: i for i, name in enumerate(j.get("fields", []))}
 
     def get(row, field):
@@ -244,13 +242,14 @@ def main():
     gdate = dt.date.fromisoformat(args.date)
     codes = [c.strip() for c in args.codes.split(",") if c.strip()]
 
+    # Fetch TPEx close quotes first, so we can determine market per code (best-effort)
+    tpex_close = tpex_close_quotes(gdate)
+
     # Determine market per code (best-effort): if code appears in TPEx close quotes for the day, treat as TPEx
-    # tpex_close computed above
     market_map = {c: ("TPEX" if c in tpex_close else "TWSE") for c in codes}
 
     twse_insti = twse_t86(gdate)
     tpex_insti = tpex_3insti(gdate)
-    # tpex_close computed above
 
     out = {}
     for code in codes:
