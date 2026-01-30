@@ -69,7 +69,8 @@ def main():
 
     # Append as-is; caller is responsible for sending markdown-friendly text.
     # Keep chronological order: always append.
-    block = f"## {d.isoformat()}\n\n{text}\n\n"
+    dow = d.strftime('%a')
+    block = f"## {d.isoformat()} ({dow})\n\n{text}\n\n"
 
     existing = out.read_text(encoding="utf-8")
     if not existing.endswith("\n"):
