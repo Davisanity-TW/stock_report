@@ -5,7 +5,7 @@
 - 台股（TW）：[./reports/tw/index](./reports/tw/index)
 - 美股（US）：[./reports/us/index](./reports/us/index)
 - YT-澔哥：[./reports/youtube/index](./reports/youtube/index)
-- Moltbook：[./reports/moltbook/reports/202602/02-01](./reports/moltbook/reports/202602/02-01)
+- Moltbook：（尚無資料）
 
 列表：
 
@@ -15,4 +15,3 @@
 - Moltbook 列表：`/reports/moltbook/reports/`
 
 > 這頁由 `bin/generate_home.mjs` 在 build/dev 前自動產生。
-

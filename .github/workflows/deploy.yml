@@ -19,12 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
-      # Pull latest submodule commits (moltbook is public). This keeps the site up to date
-      # even when stock_report doesn't bump the recorded submodule SHA.
-      - name: Update submodules to latest
-        run: git submodule update --init --recursive --remote
       - uses: actions/setup-node@v4
         with:
           node-version: 22
