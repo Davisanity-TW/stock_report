@@ -1,0 +1,135 @@
+version: 1
+description: >
+  Data sources for clawdbot to collect real-time financial news covering Taiwan and global markets.
+  Designed for RSS-first, API-optional, with deduplication and weighting.
+
+# =========================
+# Global Settings
+# =========================
+global:
+  default_time_window_hours: 6
+  language_priority:
+    - zh-TW
+    - zh
+    - en
+  deduplication:
+    method: hybrid
+    rules:
+      - type: exact_url
+      - type: title_similarity
+        threshold: 0.9
+      - type: same_entities
+        window_hours: 24
+
+# =========================
+# Taiwan Financial News
+# =========================
+taiwan:
+  tier1_core:
+    description: "High-reliability Taiwan financial news"
+    sources:
+      - id: cna_finance
+        name: 中央社－財經
+        type: rss
+        url: https://feeds.feedburner.com/rsscna/finance
+        language: zh-TW
+        weight: 1.0
+        tags: [taiwan, finance, macro]
+      - id: cna_stock
+        name: 中央社－證券
+        type: rss
+        url: https://feeds.feedburner.com/rsscna/finance
+        language: zh-TW
+        weight: 1.0
+        tags: [taiwan, stocks, equities]
+  tier2_supplement:
+    description: "Supplementary Taiwan news via aggregation"
+    sources:
+      - id: google_news_tw_markets
+        name: Google News Taiwan Markets
+        type: rss
+        query: "台股 OR 台灣 股市 OR 匯率 OR 央行"
+        url_template: "https://news.google.com/rss/search?q={query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        language: zh-TW
+        weight: 0.6
+        tags: [taiwan, aggregated]
+
+# =========================
+# Global Financial News
+# =========================
+global_markets:
+  tier1_core:
+    description: "Authoritative global financial news"
+    sources:
+      - id: reuters_markets
+        name: Reuters - Global Markets
+        type: rss
+        url: https://www.reuters.com/rssFeed/globalMarketsNews
+        language: en
+        weight: 1.0
+        tags: [global, markets, macro]
+      - id: nikkei_asia
+        name: Nikkei Asia
+        type: rss
+        url: https://asia.nikkei.com/rss/feed/nar
+        language: en
+        weight: 0.9
+        tags: [asia, markets, equities]
+  tier2_supplement:
+    description: "Broad global coverage via aggregation"
+    sources:
+      - id: google_news_global_markets
+        name: Google News Global Markets
+        type: rss
+        query: "markets OR stocks OR bonds OR inflation OR Fed OR oil"
+        url_template: "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+        language: en
+        weight: 0.6
+        tags: [global, aggregated]
+
+# =========================
+# Optional API-based Sources
+# =========================
+apis:
+  enabled: false # set true only if API key is configured
+  sources:
+    - id: newsapi_everything
+      name: NewsAPI Everything
+      type: api
+      provider: newsapi
+      endpoint: /v2/everything
+      params:
+        q: "markets OR economy OR inflation OR central bank"
+        language: en
+        sortBy: publishedAt
+      weight: 0.5
+      tags: [global, api]
+    - id: gdelt_events
+      name: GDELT Events
+      type: api
+      provider: gdelt
+      endpoint: events
+      params:
+        themes: [ECON_INFLATION, ECON_INTEREST_RATE, ECON_STOCK_MARKET]
+        timespan_hours: 24
+      weight: 0.4
+      tags: [global, trends, api]
+
+# =========================
+# Output Preferences
+# =========================
+output:
+  max_items_per_region:
+    taiwan: 8
+    global: 8
+  fields:
+    - headline
+    - one_line_summary
+    - key_entities
+    - key_numbers
+    - potential_impact
+    - source
+    - link
+  final_sections:
+    - daily_key_themes
+    - events_to_watch
