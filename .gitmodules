@@ -1,0 +1,3 @@
+[submodule "external/moltbook"]
+	path = external/moltbook
+	url = https://github.com/Davisanity-TW/moltbook
