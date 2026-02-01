@@ -1,3 +1,13 @@
+# secrets/tmp
 /secrets/
 /tmp/
 /secrets/*.txt
+
+# node
+node_modules/
+
+# vitepress build output
+/docs/.vitepress/dist/
+
+# OS
+.DS_Store

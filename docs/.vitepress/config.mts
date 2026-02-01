@@ -1,4 +1,20 @@
 import { defineConfig } from 'vitepress'
+import { readdirSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+
+function listMdBasenames(dirFromDocsRoot: string) {
+  const abs = join(process.cwd(), 'docs', dirFromDocsRoot)
+  if (!existsSync(abs)) return []
+  return readdirSync(abs)
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => f.replace(/\.md$/, ''))
+}
+
+function makeItems(prefix: string, dirFromDocsRoot: string, limit = 20) {
+  // newest first (filenames like 2026-W05 / 2026-02-01)
+  const names = listMdBasenames(dirFromDocsRoot).sort().reverse().slice(0, limit)
+  return names.map((name) => ({ text: name, link: `/${prefix}/${name}` }))
+}
 
 export default defineConfig({
   lang: 'zh-Hant',
@@ -8,26 +24,31 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: '首頁', link: '/' },
-      { text: '台股（TW）', link: '/reports/tw/2026-W05' },
-      { text: '美股（US）', link: '/reports/us/2026-W05' },
-      { text: 'YouTube', link: '/reports/youtube/2026-W05' },
-      { text: 'Moltbook', link: '/reports/moltbook/2026-02-01' }
+      { text: '台股（TW）', link: '/reports/tw/' },
+      { text: '美股（US）', link: '/reports/us/' },
+      { text: 'YouTube', link: '/reports/youtube/' },
+      { text: 'Moltbook', link: '/reports/moltbook/' }
     ],
     sidebar: [
       {
         text: '導覽',
-        items: [
-          { text: '首頁', link: '/' }
-        ]
+        items: [{ text: '首頁', link: '/' }]
       },
       {
-        text: 'Reports',
-        items: [
-          { text: '台股（TW）', link: '/reports/tw/2026-W05' },
-          { text: '美股（US）', link: '/reports/us/2026-W05' },
-          { text: 'YouTube', link: '/reports/youtube/2026-W05' },
-          { text: 'Moltbook', link: '/reports/moltbook/2026-02-01' }
-        ]
+        text: '台股（TW）',
+        items: makeItems('reports/tw', 'reports/tw', 30)
+      },
+      {
+        text: '美股（US）',
+        items: makeItems('reports/us', 'reports/us', 30)
+      },
+      {
+        text: 'YouTube',
+        items: makeItems('reports/youtube', 'reports/youtube', 30)
+      },
+      {
+        text: 'Moltbook',
+        items: makeItems('reports/moltbook', 'reports/moltbook', 60)
       }
     ]
   }
