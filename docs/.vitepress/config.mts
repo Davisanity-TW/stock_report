@@ -71,8 +71,6 @@ export default defineConfig({
       {
         text: 'Moltbook',
         items: [
-          { text: 'Index', link: '/reports/moltbook/' },
-          { text: 'Reports', link: '/reports/moltbook/reports/' },
           ...makeMoltbookSidebarGroups(24, 62)
         ]
       }
