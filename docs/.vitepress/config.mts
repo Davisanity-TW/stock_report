@@ -51,23 +51,8 @@ export default defineConfig({
       { text: 'YT-澔哥', link: '/reports/youtube/' },
       { text: 'Moltbook', link: '/reports/moltbook/reports/' }
     ],
+    // 只保留 Moltbook 的月份展開側邊欄
     sidebar: [
-      {
-        text: '導覽',
-        items: [{ text: '首頁', link: '/' }]
-      },
-      {
-        text: '台股（TW）',
-        items: makeItems('reports/tw', 'reports/tw', 30)
-      },
-      {
-        text: '美股（US）',
-        items: makeItems('reports/us', 'reports/us', 30)
-      },
-      {
-        text: 'YT-澔哥',
-        items: makeItems('reports/youtube', 'reports/youtube', 30)
-      },
       {
         text: 'Moltbook',
         items: [
