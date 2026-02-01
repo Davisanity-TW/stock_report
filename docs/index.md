@@ -15,3 +15,4 @@
 - Moltbook 列表：`/reports/moltbook/reports/`
 
 > 這頁由 `bin/generate_home.mjs` 在 build/dev 前自動產生。
+
