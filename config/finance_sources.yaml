@@ -48,7 +48,7 @@ taiwan:
       - id: google_news_tw_markets
         name: Google News Taiwan Markets
         type: rss
-        query: "台股 OR 台灣 股市 OR 匯率 OR 央行"
+        query: "台股 OR 台灣 股市 OR 匯率 OR 美元 OR 台幣 OR 利率 OR 殖利率 OR 公債 OR 國債 OR 金價 OR 黃金 OR 銀價 OR 白銀 OR 比特幣 OR BTC"
         url_template: "https://news.google.com/rss/search?q={query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         language: zh-TW
         weight: 0.6
@@ -81,7 +81,7 @@ global_markets:
       - id: google_news_global_markets
         name: Google News Global Markets
         type: rss
-        query: "markets OR stocks OR bonds OR inflation OR Fed OR oil"
+        query: "markets OR stocks OR bonds OR inflation OR Fed OR oil OR gold OR silver OR bitcoin OR BTC OR FX OR currency OR USD OR TWD OR yields OR rates OR treasury"
         url_template: "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
         language: en
         weight: 0.6
