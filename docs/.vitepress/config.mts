@@ -26,7 +26,7 @@ export default defineConfig({
       { text: '首頁', link: '/' },
       { text: '台股（TW）', link: '/reports/tw/' },
       { text: '美股（US）', link: '/reports/us/' },
-      { text: 'YouTube', link: '/reports/youtube/' },
+      { text: 'YT-澔哥', link: '/reports/youtube/' },
       { text: 'Moltbook', link: '/reports/moltbook/' }
     ],
     sidebar: [
@@ -43,7 +43,7 @@ export default defineConfig({
         items: makeItems('reports/us', 'reports/us', 30)
       },
       {
-        text: 'YouTube',
+        text: 'YT-澔哥',
         items: makeItems('reports/youtube', 'reports/youtube', 30)
       },
       {
