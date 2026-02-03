@@ -7,7 +7,7 @@ description: >
 # Global Settings
 # =========================
 global:
-  default_time_window_hours: 6
+  default_time_window_hours: 5
   language_priority:
     - zh-TW
     - zh
@@ -45,6 +45,20 @@ taiwan:
   tier2_supplement:
     description: "Supplementary Taiwan news via aggregation"
     sources:
+      - id: yahoo_stock_tw_market
+        name: Yahoo股市 RSS－台股動態
+        type: rss
+        url: https://tw.stock.yahoo.com/rss?category=tw-market
+        language: zh-TW
+        weight: 0.9
+        tags: [taiwan, stocks, yahoo]
+      - id: yahoo_stock_news
+        name: Yahoo股市 RSS－最新新聞
+        type: rss
+        url: https://tw.stock.yahoo.com/rss?category=news
+        language: zh-TW
+        weight: 0.7
+        tags: [taiwan, finance, yahoo]
       - id: google_news_tw_markets
         name: Google News Taiwan Markets
         type: rss
