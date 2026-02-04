@@ -34,6 +34,13 @@ NAME_MAP = {
     # The following codes may be TWSE/TPEX; keep names best-effort
     "8299": "群聯",
     "6669": "緯穎",
+
+    # LEO satellite / satellite-comm related (concept watch)
+    "3491": "昇達科",
+    "6285": "啟碁",
+    "5388": "中磊",
+    "8086": "宏捷科",
+    "3105": "穩懋",
 }
 
 
