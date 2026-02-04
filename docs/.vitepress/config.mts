@@ -26,7 +26,8 @@ export default defineConfig({
       { text: '首頁', link: '/' },
       { text: '台股（TW）', link: '/reports/tw/' },
       { text: '美股（US）', link: '/reports/us/' },
-      { text: 'YT-澔哥', link: '/reports/youtube/' }
+      { text: 'YT-澔哥', link: '/reports/youtube/' },
+      { text: '財經新聞快報', link: '/reports/finance_news/' }
     ],
     sidebar: [
       {
@@ -44,6 +45,10 @@ export default defineConfig({
       {
         text: 'YT-澔哥',
         items: makeItems('reports/youtube', 'reports/youtube', 30)
+      },
+      {
+        text: '財經新聞快報',
+        items: makeItems('reports/finance_news', 'reports/finance_news', 30)
       }
     ]
   }

@@ -34,7 +34,8 @@ ensureDir(docsReportsRoot)
 const sections = [
   { key: 'tw', title: '台股（TW）' },
   { key: 'us', title: '美股（US）' },
-  { key: 'youtube', title: 'YT-澔哥' }
+  { key: 'youtube', title: 'YT-澔哥' },
+  { key: 'finance_news', title: '財經新聞快報' }
 ]
 
 for (const s of sections) {
