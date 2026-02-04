@@ -62,7 +62,7 @@ taiwan:
       - id: google_news_tw_markets
         name: Google News Taiwan Markets
         type: rss
-        query: "台股 OR 台灣 股市 OR 匯率 OR 美元 OR 台幣 OR 利率 OR 殖利率 OR 公債 OR 國債 OR 金價 OR 黃金 OR 銀價 OR 白銀 OR 比特幣 OR BTC OR 低軌衛星 OR 衛星通訊 OR Starlink OR Kuiper OR OneWeb"
+        query: "台股 OR 台灣 股市 OR 匯率 OR 美元 OR 台幣 OR 利率 OR 殖利率 OR 公債 OR 國債 OR 金價 OR 黃金 OR 銀價 OR 白銀 OR 比特幣 OR BTC OR 低軌衛星 OR 衛星通訊 OR Starlink OR Kuiper OR OneWeb OR 光通訊 OR 雷射 OR 矽光子 OR CPO OR 光模組 OR 光收發"
         url_template: "https://news.google.com/rss/search?q={query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         language: zh-TW
         weight: 0.6
@@ -95,7 +95,7 @@ global_markets:
       - id: google_news_global_markets
         name: Google News Global Markets
         type: rss
-        query: "markets OR stocks OR bonds OR inflation OR Fed OR oil OR gold OR silver OR bitcoin OR BTC OR FX OR currency OR USD OR TWD OR yields OR rates OR treasury OR satellite communications OR LEO satellite OR Starlink OR Project Kuiper OR OneWeb OR AST SpaceMobile"
+        query: "markets OR stocks OR bonds OR inflation OR Fed OR oil OR gold OR silver OR bitcoin OR BTC OR FX OR currency OR USD OR TWD OR yields OR rates OR treasury OR satellite communications OR LEO satellite OR Starlink OR Project Kuiper OR OneWeb OR AST SpaceMobile OR optical communications OR photonics OR laser OR silicon photonics OR co-packaged optics OR CPO OR transceiver"
         url_template: "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
         language: en
         weight: 0.6
