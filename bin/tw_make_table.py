@@ -57,6 +57,16 @@ def fmt(x):
     return "NA" if x is None else str(x)
 
 
+def fmt_pct(x):
+    """Format percent change to 1 decimal place (with sign and %)."""
+    if x is None:
+        return "NA"
+    try:
+        return f"{float(x):+.1f}%"
+    except Exception:
+        return "NA"
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: tw_make_table.py /path/to/tw-data.json", file=sys.stderr)
@@ -93,7 +103,7 @@ def main():
             name,
             fmt(r.get("close")),
             fmt(r.get("change")),
-            fmt(r.get("pct")),
+            fmt_pct(r.get("pct")),
             fmt(r.get("volume_lots")),
             fmt(insti.get("foreign_lots")),
             fmt(insti.get("it_lots")),
