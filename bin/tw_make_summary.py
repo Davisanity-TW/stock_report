@@ -83,16 +83,101 @@ def main():
     data = _load_json(args.data)
 
     # Index numbers
-    close = idx.get("close")
-    chg = idx.get("change")
-    chgp = idx.get("change_pct")
+    # We support two cache formats:
+    # (A) flattened: {close, change, change_pct}
+    # (B) raw wrapper: {data:{fields:[...], data:[[...], ...]}} from TWSE FMTQIK
+
+    def _to_float_maybe(x):
+        try:
+            if x is None:
+                return None
+            if isinstance(x, (int, float)):
+                return float(x)
+            s = str(x).strip().replace(",", "")
+            if s in {"", "-", "--", "NA", "N/A"}:
+                return None
+            return float(s)
+        except Exception:
+            return None
+
+    def _roc_date_str(gdate: dt.date) -> str:
+        roc_year = gdate.year - 1911
+        return f"{roc_year:03d}/{gdate.month:02d}/{gdate.day:02d}"
+
+    def _parse_fmtqik(cache: dict, day_str: str):
+        """Best-effort parse for TWSE afterTrading/FMTQIK response.
+
+        Expected (cache):
+          {
+            "data": {
+              "fields": ["日期", ..., "發行量加權股價指數", "漲跌點數"],
+              "data": [["115/02/26", ..., "35414.49", "1.42"], ...]
+            }
+          }
+        """
+        try:
+            gdate = dt.date.fromisoformat(day_str)
+        except Exception:
+            return None, None, None, "bad_date"
+
+        wrapper = cache.get("data") if isinstance(cache, dict) else None
+        if not isinstance(wrapper, dict):
+            return None, None, None, "missing:data"
+
+        fields = wrapper.get("fields") or []
+        rows = wrapper.get("data") or []
+        if not isinstance(fields, list) or not isinstance(rows, list):
+            return None, None, None, "bad_schema"
+
+        # Find column indices
+        try:
+            i_date = fields.index("日期")
+            i_close = fields.index("發行量加權股價指數")
+            i_chg = fields.index("漲跌點數")
+        except ValueError:
+            return None, None, None, "missing_fields"
+
+        target = _roc_date_str(gdate)
+        row = None
+        for r in rows:
+            if isinstance(r, list) and len(r) > max(i_date, i_close, i_chg) and str(r[i_date]).strip() == target:
+                row = r
+                break
+        # Fallback: use the last row (usually the latest trading day) if exact match not found
+        if row is None and rows:
+            r = rows[-1]
+            if isinstance(r, list) and len(r) > max(i_date, i_close, i_chg):
+                row = r
+
+        if row is None:
+            return None, None, None, "row_not_found"
+
+        close = _to_float_maybe(row[i_close])
+        chg = _to_float_maybe(row[i_chg])
+        if close is None or chg is None:
+            return None, None, None, "parse_failed"
+
+        prev = close - chg
+        chgp = (chg / prev * 100.0) if prev else 0.0
+        return close, chg, chgp, None
+
+    close = _to_float_maybe(idx.get("close"))
+    chg = _to_float_maybe(idx.get("change"))
+    chgp = _to_float_maybe(idx.get("change_pct"))
     idx_err = idx.get("error")
+
+    if close is None or chg is None or chgp is None:
+        c2, d2, p2, err2 = _parse_fmtqik(idx, day)
+        if c2 is not None and d2 is not None and p2 is not None:
+            close, chg, chgp = c2, d2, p2
+        else:
+            idx_err = idx_err or err2 or "資料不足"
 
     if close is None or chg is None or chgp is None:
         idx_line = f"- 大盤（加權指數）：NA（{idx_err or '資料不足'}）。"
     else:
         # keep sign in change_pct if present
-        idx_line = f"- 大盤（加權指數）：收 {close} 點，{chg:+g} 點（{chgp:+.2f}%）。"
+        idx_line = f"- 大盤（加權指數）：收 {close:,.2f} 點，{chg:+g} 點（{chgp:+.2f}%）。"
 
     # Institutions: sums over watchlist items only
     f_sum = _sum_inst(data, "inst_foreign")
