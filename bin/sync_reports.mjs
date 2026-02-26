@@ -35,6 +35,7 @@ const sections = [
   { key: 'tw', title: '台股（TW）' },
   { key: 'us', title: '美股（US）' },
   { key: 'youtube', title: 'YT-澔哥' },
+  { key: 'guai', title: '股癌' },
   { key: 'finance_news', title: '財經新聞快報' }
 ]
 
