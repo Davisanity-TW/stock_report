@@ -41,10 +41,44 @@ def _weekday_en(date_str: str) -> str:
     return d.strftime("%a")
 
 
+def _iter_items(data: dict):
+    """Yield normalized item dicts.
+
+    Supports two cache shapes:
+    1) Newer: {"items": [{code,name,change_pct,volume,inst_*}, ...]}
+    2) Current tw_report_data.py output: {"2330": {close,pct,volume_lots,insti{...}}, ...}
+    """
+    if not isinstance(data, dict):
+        return
+    items = data.get("items")
+    if isinstance(items, list):
+        for it in items:
+            if isinstance(it, dict):
+                yield it
+        return
+
+    # dict keyed by code
+    for code, r in data.items():
+        if code == "items":
+            continue
+        if not isinstance(r, dict):
+            continue
+        insti = r.get("insti") or {}
+        yield {
+            "code": code,
+            "name": r.get("name"),
+            "change_pct": r.get("pct"),
+            "volume": r.get("volume_lots"),
+            "inst_foreign": insti.get("foreign_lots"),
+            "inst_investment_trust": insti.get("it_lots"),
+            "inst_dealer": insti.get("dealer_lots"),
+        }
+
+
 def _sum_inst(data: dict, key: str):
     total = 0
     ok = False
-    for it in (data.get("items") or []):
+    for it in _iter_items(data):
         v = it.get(key)
         if isinstance(v, (int, float)):
             total += v
@@ -120,12 +154,21 @@ def main():
         except Exception:
             return None, None, None, "bad_date"
 
-        wrapper = cache.get("data") if isinstance(cache, dict) else None
-        if not isinstance(wrapper, dict):
+        # Two shapes seen in the wild:
+        # 1) raw: {stat, fields:[...], data:[[...]]}
+        # 2) wrapped: {data:{fields:[...], data:[[...]]}}
+        if not isinstance(cache, dict):
             return None, None, None, "missing:data"
 
-        fields = wrapper.get("fields") or []
-        rows = wrapper.get("data") or []
+        if isinstance(cache.get("fields"), list) and isinstance(cache.get("data"), list):
+            fields = cache.get("fields") or []
+            rows = cache.get("data") or []
+        else:
+            wrapper = cache.get("data")
+            if not isinstance(wrapper, dict):
+                return None, None, None, "missing:data"
+            fields = wrapper.get("fields") or []
+            rows = wrapper.get("data") or []
         if not isinstance(fields, list) or not isinstance(rows, list):
             return None, None, None, "bad_schema"
 
@@ -209,10 +252,41 @@ def main():
         ]
 
     # Potential strength list: take top movers among items that have change_pct
+    # Minimal mapping for names (fallback)
+    NAME_MAP = {
+        "0050": "元大台灣50",
+        "00631L": "元大台灣50正2",
+        "2330": "台積電",
+        "2454": "聯發科",
+        "2317": "鴻海",
+        "2308": "台達電",
+        "8299": "群聯",
+        "6669": "緯穎",
+        "2344": "華邦電",
+        "2327": "國巨",
+        "2449": "京元電子",
+        "2357": "華碩",
+        "3017": "奇鋐",
+        "2408": "南亞科",
+        "2337": "旺宏",
+        "3491": "昇達科",
+        "6285": "啟碁",
+        "5388": "中磊",
+        "8086": "宏捷科",
+        "3105": "穩懋",
+        "4979": "華星光",
+        "3163": "波若威",
+        "3363": "上詮",
+        "3234": "光環",
+        "3081": "聯亞",
+        "6442": "光聖",
+        "3450": "聯鈞",
+    }
+
     movers = []
-    for it in (data.get("items") or []):
+    for it in _iter_items(data):
         code = it.get("code")
-        name = it.get("name")
+        name = it.get("name") or (NAME_MAP.get(code) if code else None)
         cp = it.get("change_pct")
         vol = it.get("volume")
         if isinstance(cp, (int, float)) and code and name:
