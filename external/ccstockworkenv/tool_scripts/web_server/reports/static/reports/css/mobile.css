@@ -1,0 +1,83 @@
+/*
+ * Mobile-first RWD styles for CCStockWorkEnv reports
+ * Overrides inline styles from generated HTML reports
+ */
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Better touch targets on touch devices */
+@media (hover: none) and (pointer: coarse) {
+    a, button, input, select, textarea {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* ==================== Mobile (< 768px) ==================== */
+@media (max-width: 768px) {
+    /* Header */
+    header {
+        padding: 16px !important;
+    }
+
+    header h1 {
+        font-size: 1.2em !important;
+    }
+
+    /* Main container */
+    main {
+        margin: 12px auto !important;
+        padding: 0 8px !important;
+    }
+
+    /* Footer */
+    footer {
+        padding: 16px !important;
+        font-size: 0.8em !important;
+    }
+
+    /* Buttons */
+    .btn, .btn-back {
+        font-size: 0.9em !important;
+        padding: 10px 14px !important;
+    }
+
+    /* Images */
+    img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    /* Code blocks */
+    pre, code {
+        font-size: 0.8em !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+/* ==================== Tablet (769px - 1024px) ==================== */
+@media (min-width: 769px) and (max-width: 1024px) {
+    main {
+        max-width: 95% !important;
+    }
+}
+
+/* ==================== Print ==================== */
+@media print {
+    header, footer, .btn, .btn-back {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+    }
+
+    main {
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+}

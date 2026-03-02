@@ -1,0 +1,4 @@
+{
+    "note": "No API keys needed for default setup. yfinance, twstock, and AKShare are free.",
+    "finmind_token": "optional-finmind-api-token"
+}

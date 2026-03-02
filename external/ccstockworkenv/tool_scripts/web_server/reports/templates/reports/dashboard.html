@@ -1,0 +1,365 @@
+{% extends 'reports/base.html' %}
+
+{% block title %}CCStockWorkEnv Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- System Status -->
+<section class="section">
+    <h2 class="section-title">⚙️ 系統狀態</h2>
+    <div class="status-grid">
+        <div class="status-card">
+            <div class="status-icon {% if status.config_status == 'ok' %}status-ok{% else %}status-err{% endif %}"></div>
+            <div class="status-info">
+                <div class="status-label">Config</div>
+                <div class="status-value">{{ status.config_status }}</div>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-icon {% if status.db_status == 'ok' %}status-ok{% else %}status-err{% endif %}"></div>
+            <div class="status-info">
+                <div class="status-label">Database</div>
+                <div class="status-value">{{ status.db_size }}</div>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-icon status-ok"></div>
+            <div class="status-info">
+                <div class="status-label">Web Server</div>
+                <div class="status-value">Running</div>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-icon status-ok"></div>
+            <div class="status-info">
+                <div class="status-label">Reports</div>
+                <div class="status-value">{{ status.report_count }} HTML / {{ status.md_count }} MD</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Schedulers -->
+<section class="section">
+    <h2 class="section-title">🕐 排程任務 ({{ schedules|length }})</h2>
+    {% if schedules %}
+        {% for sched in schedules %}
+        <div class="item-card">
+            <div class="item-main">
+                <h3 class="item-title">{{ sched.name }}</h3>
+                <p class="item-meta">
+                    ⏰ {{ sched.schedule }}
+                    <span class="sched-status sched-{{ sched.status }}">{{ sched.status }}</span>
+                </p>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">尚無排程任務。透過 Telegram Bot 設定定時任務。</div>
+    {% endif %}
+</section>
+
+<!-- Latest Reports -->
+<section class="section">
+    <div class="section-header">
+        <h2 class="section-title">📊 最新報告</h2>
+        <a href="{% url 'report_list' %}" class="btn btn-sm">全部報告 ({{ total_reports }}) →</a>
+    </div>
+    {% if reports %}
+        {% for report in reports %}
+        <div class="item-card">
+            <div class="item-main">
+                <h3 class="item-title">{{ report.display_name }}</h3>
+                <p class="item-meta">📅 {{ report.date|date:"Y-m-d H:i" }}</p>
+            </div>
+            {% if report.html_path %}
+            <a href="{% url 'report_detail' report.url_slug %}" class="btn btn-sm">查看</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">目前尚無報告</div>
+    {% endif %}
+</section>
+
+<!-- Commands -->
+<section class="section">
+    <h2 class="section-title">🤖 可用指令 ({{ commands|length }})</h2>
+    <p class="section-desc">透過 Telegram Bot 輸入以下指令來操作 CCStockWorkEnv</p>
+    <div class="cmd-grid">
+        {% for cmd in commands %}
+        <div class="cmd-card">
+            <code class="cmd-name">{{ cmd.slash }}</code>
+            <div class="cmd-title">{{ cmd.title }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Skills -->
+<section class="section">
+    <h2 class="section-title">🧠 知識技能 ({{ skills|length }})</h2>
+    <p class="section-desc">系統內建的領域知識與操作規範</p>
+    <div class="skill-list">
+        {% for skill in skills %}
+        <div class="skill-item">
+            <span class="skill-dot"></span>
+            <span class="skill-title">{{ skill.title }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Access Info -->
+<section class="section">
+    <h2 class="section-title">🔗 存取資訊</h2>
+    <div class="info-card">
+        <div class="info-row">
+            <span class="info-label">外網網址</span>
+            <code class="info-value">{{ status.web_url }}</code>
+        </div>
+        <div class="info-row">
+            <span class="info-label">本地網址</span>
+            <code class="info-value">http://localhost:8800</code>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Telegram Bot</span>
+            <span class="info-value">透過 Bot 下達指令</span>
+        </div>
+    </div>
+</section>
+
+<style>
+    /* Section */
+    .section {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .section-title {
+        font-size: 1.2em;
+        color: #2c3e50;
+        margin: 0 0 12px 0;
+        padding: 0;
+        border: none;
+    }
+
+    .section-desc {
+        font-size: 0.85em;
+        color: #95a5a6;
+        margin: -4px 0 16px 0;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .section-header .section-title { margin-bottom: 0; }
+
+    /* Status Grid */
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .status-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .status-icon {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .status-ok { background: #27ae60; }
+    .status-err { background: #e74c3c; }
+
+    .status-label {
+        font-size: 0.75em;
+        color: #95a5a6;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .status-value {
+        font-size: 0.9em;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    /* Item Card */
+    .item-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .item-card:last-child { border-bottom: none; }
+
+    .item-title {
+        font-size: 1em;
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0;
+    }
+
+    .item-meta {
+        font-size: 0.8em;
+        color: #95a5a6;
+        margin: 4px 0 0 0;
+    }
+
+    /* Button */
+    .btn-sm {
+        display: inline-block;
+        padding: 6px 14px;
+        background: #3498db;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 0.85em;
+        white-space: nowrap;
+    }
+
+    .btn-sm:hover { background: #2980b9; }
+
+    /* Command Grid */
+    .cmd-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .cmd-card {
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border-left: 3px solid #3498db;
+    }
+
+    .cmd-name {
+        font-size: 0.9em;
+        font-weight: 700;
+        color: #3498db;
+        background: transparent;
+        padding: 0;
+    }
+
+    .cmd-title {
+        font-size: 0.8em;
+        color: #666;
+        margin-top: 2px;
+    }
+
+    /* Skill List */
+    .skill-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .skill-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: #f8f9fa;
+        border-radius: 20px;
+        font-size: 0.85em;
+    }
+
+    .skill-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #27ae60;
+        flex-shrink: 0;
+    }
+
+    .skill-title { color: #2c3e50; }
+
+    /* Scheduler Status */
+    .sched-status {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.75em;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    .sched-running { background: #d5f5e3; color: #27ae60; }
+    .sched-loaded { background: #d6eaf8; color: #2980b9; }
+    .sched-not\ loaded { background: #fadbd8; color: #e74c3c; }
+    .sched-unknown { background: #f0f0f0; color: #999; }
+
+    /* Info Card */
+    .info-card {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 4px 16px;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+
+    .info-row:last-child { border-bottom: none; }
+
+    .info-label {
+        font-size: 0.85em;
+        color: #666;
+    }
+
+    .info-value {
+        font-size: 0.85em;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 24px;
+        color: #bdc3c7;
+        font-size: 0.9em;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+        .section { padding: 16px; }
+        .section-title { font-size: 1.1em; }
+
+        .status-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .status-card { padding: 10px; }
+
+        .cmd-grid { grid-template-columns: 1fr; }
+
+        .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+        .info-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+
+        .skill-item { font-size: 0.8em; padding: 6px 10px; }
+    }
+</style>
+{% endblock %}

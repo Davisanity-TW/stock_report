@@ -1,0 +1,395 @@
+{% extends 'reports/base.html' %}
+{% load static %}
+
+{% block title %}{{ ticker }} K線圖 - CCStockWorkEnv{% endblock %}
+
+{% block content %}
+<style>
+    .chart-header {
+        background: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .chart-header h2 {
+        font-size: 1.3em;
+        color: #2c3e50;
+        margin-bottom: 4px;
+    }
+    .chart-header .ticker-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #3498db;
+        color: white;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: 600;
+        margin-right: 6px;
+    }
+    .chart-header .market-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #ecf0f1;
+        color: #7f8c8d;
+        border-radius: 4px;
+        font-size: 0.85em;
+    }
+
+    .period-selector {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        background: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .period-btn {
+        padding: 8px 14px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        background: white;
+        color: #555;
+        font-size: 0.9em;
+        font-weight: 500;
+        cursor: pointer;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .period-btn:hover {
+        border-color: #3498db;
+        color: #3498db;
+    }
+    .period-btn.active {
+        background: #3498db;
+        color: white;
+        border-color: #3498db;
+    }
+
+    .chart-container {
+        background: white;
+        padding: 16px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 12px;
+    }
+    #chart-wrapper {
+        width: 100%;
+        height: 400px;
+    }
+
+    .price-info {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        background: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 12px;
+    }
+    .price-info-item {
+        flex: 1;
+        min-width: 100px;
+    }
+    .price-info-item .label {
+        font-size: 0.8em;
+        color: #95a5a6;
+        margin-bottom: 2px;
+    }
+    .price-info-item .value {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    .price-info-item .value.positive { color: #e74c3c; }
+    .price-info-item .value.negative { color: #27ae60; }
+
+    .chart-loading, .chart-error {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
+        color: #95a5a6;
+        font-size: 1.1em;
+    }
+    .chart-error { color: #e74c3c; }
+
+    @media (max-width: 768px) {
+        #chart-wrapper { height: 300px; }
+        .chart-container { padding: 8px; }
+        .chart-header { padding: 12px 16px; }
+        .chart-header h2 { font-size: 1.15em; }
+        .period-selector { padding: 8px 12px; gap: 4px; }
+        .period-btn { padding: 6px 10px; font-size: 0.85em; min-width: 40px; min-height: 40px; }
+        .price-info { padding: 12px 16px; gap: 10px; }
+        .price-info-item .value { font-size: 1em; }
+    }
+
+    @media (max-width: 380px) {
+        #chart-wrapper { height: 250px; }
+        .period-btn { padding: 5px 8px; font-size: 0.8em; }
+    }
+</style>
+
+<a href="{% url 'dashboard' %}" class="btn btn-back" style="margin-bottom: 12px;">← 首頁</a>
+
+<div class="chart-header">
+    <h2 id="company-name">{{ ticker }}</h2>
+    <span class="ticker-badge">{{ ticker }}</span>
+    <span class="market-badge">{{ market }}</span>
+</div>
+
+<div class="period-selector" id="period-selector">
+    <button class="period-btn" data-period="1w">1W</button>
+    <button class="period-btn" data-period="1m">1M</button>
+    <button class="period-btn" data-period="3m">3M</button>
+    <button class="period-btn" data-period="6m">6M</button>
+    <button class="period-btn" data-period="1y">1Y</button>
+    <button class="period-btn" data-period="3y">3Y</button>
+    <button class="period-btn" data-period="5y">5Y</button>
+</div>
+
+<div class="chart-container">
+    <div id="chart-wrapper">
+        <div class="chart-loading" id="chart-loading">載入中...</div>
+        <div class="chart-error" id="chart-error" style="display:none;"></div>
+    </div>
+</div>
+
+<div class="price-info" id="price-info" style="display:none;">
+    <div class="price-info-item">
+        <div class="label">最新收盤</div>
+        <div class="value" id="info-close">-</div>
+    </div>
+    <div class="price-info-item">
+        <div class="label">區間漲跌</div>
+        <div class="value" id="info-change">-</div>
+    </div>
+    <div class="price-info-item">
+        <div class="label">區間最高</div>
+        <div class="value" id="info-high">-</div>
+    </div>
+    <div class="price-info-item">
+        <div class="label">區間最低</div>
+        <div class="value" id="info-low">-</div>
+    </div>
+</div>
+
+<script src="{% static 'reports/js/lightweight-charts.standalone.production.js' %}"></script>
+<script>
+(function() {
+    const TICKER = "{{ ticker }}";
+    const MARKET = "{{ market }}";
+    let currentPeriod = "{{ period }}";
+    let chart = null;
+    let candleSeries = null;
+    let volumeSeries = null;
+
+    // Set active period button
+    function setActivePeriod(period) {
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.period === period);
+        });
+    }
+
+    // Format number with appropriate precision
+    function fmt(n, decimals) {
+        if (n == null) return '-';
+        if (decimals === undefined) {
+            decimals = n >= 100 ? 0 : n >= 1 ? 2 : 4;
+        }
+        return n.toLocaleString(undefined, {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+        });
+    }
+
+    function showLoading() {
+        document.getElementById('chart-loading').style.display = 'flex';
+        document.getElementById('chart-error').style.display = 'none';
+    }
+
+    function hideLoading() {
+        document.getElementById('chart-loading').style.display = 'none';
+    }
+
+    function showError(msg) {
+        document.getElementById('chart-loading').style.display = 'none';
+        const el = document.getElementById('chart-error');
+        el.textContent = msg;
+        el.style.display = 'flex';
+    }
+
+    function updatePriceInfo(records) {
+        if (!records || records.length === 0) return;
+        const info = document.getElementById('price-info');
+        info.style.display = 'flex';
+
+        const latest = records[records.length - 1];
+        const first = records[0];
+        const closes = records.map(r => r.close).filter(v => v != null);
+        const high = Math.max(...records.map(r => r.high).filter(v => v != null));
+        const low = Math.min(...records.map(r => r.low).filter(v => v != null));
+
+        document.getElementById('info-close').textContent = fmt(latest.close);
+
+        if (first.close && latest.close) {
+            const change = ((latest.close - first.close) / first.close * 100);
+            const changeEl = document.getElementById('info-change');
+            changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+            changeEl.className = 'value ' + (change >= 0 ? 'positive' : 'negative');
+        }
+
+        document.getElementById('info-high').textContent = fmt(high);
+        document.getElementById('info-low').textContent = fmt(low);
+    }
+
+    function initChart() {
+        const wrapper = document.getElementById('chart-wrapper');
+        // Clear previous chart
+        if (chart) {
+            chart.remove();
+            chart = null;
+        }
+        document.getElementById('chart-loading').style.display = 'none';
+        document.getElementById('chart-error').style.display = 'none';
+
+        chart = LightweightCharts.createChart(wrapper, {
+            width: wrapper.clientWidth,
+            height: wrapper.clientHeight,
+            layout: {
+                background: { type: 'solid', color: '#ffffff' },
+                textColor: '#333',
+                fontSize: 12,
+            },
+            grid: {
+                vertLines: { color: '#f0f0f0' },
+                horzLines: { color: '#f0f0f0' },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: '#ddd',
+            },
+            timeScale: {
+                borderColor: '#ddd',
+                timeVisible: false,
+            },
+        });
+
+        candleSeries = chart.addCandlestickSeries({
+            upColor: '#e74c3c',
+            downColor: '#27ae60',
+            borderUpColor: '#e74c3c',
+            borderDownColor: '#27ae60',
+            wickUpColor: '#e74c3c',
+            wickDownColor: '#27ae60',
+        });
+
+        volumeSeries = chart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: '',
+        });
+
+        volumeSeries.priceScale().applyOptions({
+            scaleMargins: { top: 0.8, bottom: 0 },
+        });
+
+        // Responsive resize
+        const ro = new ResizeObserver(() => {
+            chart.applyOptions({
+                width: wrapper.clientWidth,
+                height: wrapper.clientHeight,
+            });
+        });
+        ro.observe(wrapper);
+    }
+
+    async function loadData(period) {
+        currentPeriod = period;
+        setActivePeriod(period);
+
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('period', period);
+        url.searchParams.set('market', MARKET);
+        history.replaceState(null, '', url);
+
+        showLoading();
+
+        try {
+            const apiUrl = `/api/price-history/?ticker=${encodeURIComponent(TICKER)}&market=${encodeURIComponent(MARKET)}&period=${period}`;
+            const resp = await fetch(apiUrl);
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.error || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+
+            if (!data.records || data.records.length === 0) {
+                showError('無資料');
+                return;
+            }
+
+            // Update company name
+            if (data.company_name) {
+                document.getElementById('company-name').textContent = data.company_name;
+            }
+
+            // Init chart if not yet
+            if (!chart) initChart();
+
+            hideLoading();
+
+            // Map records to lightweight-charts format
+            const candles = data.records
+                .filter(r => r.open != null && r.close != null)
+                .map(r => ({
+                    time: r.date,
+                    open: r.open,
+                    high: r.high,
+                    low: r.low,
+                    close: r.close,
+                }));
+
+            const volumes = data.records
+                .filter(r => r.volume != null && r.close != null && r.open != null)
+                .map(r => ({
+                    time: r.date,
+                    value: r.volume,
+                    color: r.close >= r.open ? 'rgba(231,76,60,0.4)' : 'rgba(39,174,96,0.4)',
+                }));
+
+            candleSeries.setData(candles);
+            volumeSeries.setData(volumes);
+            chart.timeScale().fitContent();
+
+            updatePriceInfo(data.records);
+
+        } catch (e) {
+            showError('載入失敗: ' + e.message);
+        }
+    }
+
+    // Period button click handlers
+    document.getElementById('period-selector').addEventListener('click', (e) => {
+        const btn = e.target.closest('.period-btn');
+        if (!btn) return;
+        loadData(btn.dataset.period);
+    });
+
+    // Initial load
+    loadData(currentPeriod);
+})();
+</script>
+{% endblock %}

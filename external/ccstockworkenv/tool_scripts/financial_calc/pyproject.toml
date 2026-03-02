@@ -1,0 +1,8 @@
+[project]
+name = "ccstockworkenv-financial-calc"
+version = "0.1.0"
+description = "Financial calculation engines for CCStockWorkEnv"
+requires-python = ">=3.10"
+dependencies = [
+    "yfinance>=0.2.36",
+]

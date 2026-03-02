@@ -9,5 +9,8 @@ node_modules/
 # vitepress build output
 /docs/.vitepress/dist/
 
+# python venv
+.venv*/
+
 # OS
 .DS_Store

@@ -1,0 +1,154 @@
+{% extends 'reports/base.html' %}
+
+{% block title %}{{ report.display_name }} - CCStockWorkEnv{% endblock %}
+
+{% block content %}
+<!-- Original report CSS (from generated HTML <head>) -->
+{% if inline_css %}
+<style>
+    /* Scope original styles inside .report-content */
+    .report-content {
+        {{ inline_css|safe }}
+    }
+
+    /* Override original body styles that conflict */
+    .report-content {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        font-family: inherit !important;
+        color: inherit !important;
+    }
+</style>
+{% endif %}
+
+<div class="report-detail">
+    <div class="report-header" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <a href="{% url 'report_list' %}" class="btn btn-back">← 返回列表</a>
+        <h1 style="font-size: 1.5em; margin: 16px 0 8px 0; color: #2c3e50;">{{ report.display_name }}</h1>
+        <p class="meta">📅 {{ report.date|date:"Y年m月d日 H:i" }}</p>
+    </div>
+
+    <div class="report-content" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow-x: hidden;">
+        {{ content|safe }}
+    </div>
+</div>
+
+<style>
+    /* Mobile-specific overrides for report content */
+
+    /* Table wrapper for horizontal scroll */
+    .report-content table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+
+    .report-content table th,
+    .report-content table td {
+        padding: 6px 8px;
+    }
+
+    /* Card styling */
+    .report-content .card {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .report-content .card table {
+        white-space: normal;
+    }
+
+    /* Scroll hint shadow for tables */
+    .report-content table {
+        background:
+            linear-gradient(to right, white 30%, rgba(255,255,255,0)),
+            linear-gradient(to left, white 30%, rgba(255,255,255,0)),
+            linear-gradient(to right, rgba(0,0,0,0.1), rgba(0,0,0,0)),
+            linear-gradient(to left, rgba(0,0,0,0.1), rgba(0,0,0,0));
+        background-position: left center, right center, left center, right center;
+        background-repeat: no-repeat;
+        background-size: 20px 100%, 20px 100%, 10px 100%, 10px 100%;
+        background-attachment: local, local, scroll, scroll;
+    }
+
+    @media (max-width: 768px) {
+        .report-content {
+            padding: 12px !important;
+        }
+
+        .report-header h1 {
+            font-size: 1.3em !important;
+        }
+
+        .report-content h1 {
+            font-size: 1.3em !important;
+            border-bottom-width: 2px !important;
+            padding-bottom: 6px !important;
+        }
+
+        .report-content h2 {
+            font-size: 1.15em !important;
+            margin-top: 24px !important;
+        }
+
+        .report-content h3 {
+            font-size: 1.05em !important;
+        }
+
+        .report-content table {
+            font-size: 0.75em !important;
+            margin: 8px -12px !important;
+            width: calc(100% + 24px) !important;
+        }
+
+        .report-content table th,
+        .report-content table td {
+            padding: 5px 6px !important;
+        }
+
+        .report-content .card {
+            margin: 12px -12px !important;
+            border-radius: 0 !important;
+            border-left: none !important;
+            border-right: none !important;
+            padding: 12px !important;
+        }
+
+        .report-content .card table {
+            margin: 8px 0 !important;
+            width: 100% !important;
+        }
+
+        .report-content .meta {
+            font-size: 0.85em !important;
+        }
+
+        .report-content .disclaimer {
+            font-size: 0.75em !important;
+        }
+
+        .report-content ol {
+            padding-left: 20px !important;
+        }
+
+        .report-content ol li {
+            margin-bottom: 6px !important;
+        }
+    }
+
+    /* Tiny phones (iPhone SE etc) */
+    @media (max-width: 380px) {
+        .report-content table {
+            font-size: 0.65em !important;
+        }
+
+        .report-content table th,
+        .report-content table td {
+            padding: 4px !important;
+        }
+    }
+</style>
+{% endblock %}

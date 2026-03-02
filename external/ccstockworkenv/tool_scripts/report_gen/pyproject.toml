@@ -1,0 +1,9 @@
+[project]
+name = "ccstockworkenv-report-gen"
+version = "0.1.0"
+description = "Report and chart generation for CCStockWorkEnv"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.8.0",
+    "yfinance>=0.2.36",
+]

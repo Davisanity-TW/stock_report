@@ -28,7 +28,8 @@ export default defineConfig({
       { text: '美股（US）', link: '/reports/us/' },
       { text: 'YT-澔哥', link: '/reports/youtube/' },
       { text: '股癌', link: '/reports/guai/' },
-      { text: '財經新聞快報', link: '/reports/finance_news/' }
+      { text: '財經新聞快報', link: '/reports/finance_news/' },
+      { text: 'CCStockWorkEnv', link: '/reports/ccstock/' }
     ],
     sidebar: [
       {
@@ -54,6 +55,10 @@ export default defineConfig({
       {
         text: '財經新聞快報',
         items: makeItems('reports/finance_news', 'reports/finance_news', 30)
+      },
+      {
+        text: 'CCStockWorkEnv',
+        items: makeItems('reports/ccstock', 'reports/ccstock', 30)
       }
     ]
   }

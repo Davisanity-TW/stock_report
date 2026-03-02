@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ticker }} K線圖</title>
+    {% load static %}
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', sans-serif;
+            background: #fff;
+            overflow: hidden;
+        }
+        .embed-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .embed-header .title {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .embed-header .change {
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .change.positive { color: #e74c3c; }
+        .change.negative { color: #27ae60; }
+
+        .period-bar {
+            display: flex;
+            gap: 2px;
+            padding: 4px 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .period-btn {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 12px;
+            background: transparent;
+            color: #888;
+            font-size: 0.75em;
+            font-weight: 500;
+            cursor: pointer;
+            min-width: 32px;
+            min-height: 28px;
+        }
+        .period-btn:hover { background: #f0f0f0; }
+        .period-btn.active { background: #3498db; color: white; }
+
+        #chart-wrapper {
+            width: 100%;
+            height: calc(100vh - 70px);
+        }
+        .chart-loading, .chart-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #95a5a6;
+            font-size: 0.95em;
+        }
+        .chart-error { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="embed-header">
+        <span class="title" id="embed-title">{{ ticker }}</span>
+        <span class="change" id="embed-change"></span>
+    </div>
+
+    <div class="period-bar" id="period-selector">
+        <button class="period-btn" data-period="1w">1W</button>
+        <button class="period-btn" data-period="1m">1M</button>
+        <button class="period-btn" data-period="3m">3M</button>
+        <button class="period-btn" data-period="6m">6M</button>
+        <button class="period-btn" data-period="1y">1Y</button>
+        <button class="period-btn" data-period="3y">3Y</button>
+        <button class="period-btn" data-period="5y">5Y</button>
+    </div>
+
+    <div id="chart-wrapper">
+        <div class="chart-loading" id="chart-loading">載入中...</div>
+        <div class="chart-error" id="chart-error" style="display:none;"></div>
+    </div>
+
+    <script src="{% static 'reports/js/lightweight-charts.standalone.production.js' %}"></script>
+    <script>
+    (function() {
+        const TICKER = "{{ ticker }}";
+        const MARKET = "{{ market }}";
+        let currentPeriod = "{{ period }}";
+        let chart = null;
+        let candleSeries = null;
+        let volumeSeries = null;
+
+        function setActivePeriod(period) {
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.period === period);
+            });
+        }
+
+        function fmt(n) {
+            if (n == null) return '-';
+            const d = n >= 100 ? 0 : n >= 1 ? 2 : 4;
+            return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+        }
+
+        function initChart() {
+            const wrapper = document.getElementById('chart-wrapper');
+            if (chart) { chart.remove(); chart = null; }
+            document.getElementById('chart-loading').style.display = 'none';
+            document.getElementById('chart-error').style.display = 'none';
+
+            chart = LightweightCharts.createChart(wrapper, {
+                width: wrapper.clientWidth,
+                height: wrapper.clientHeight,
+                layout: {
+                    background: { type: 'solid', color: '#ffffff' },
+                    textColor: '#333',
+                    fontSize: 11,
+                },
+                grid: {
+                    vertLines: { color: '#f5f5f5' },
+                    horzLines: { color: '#f5f5f5' },
+                },
+                rightPriceScale: { borderColor: '#eee' },
+                timeScale: { borderColor: '#eee', timeVisible: false },
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#e74c3c', downColor: '#27ae60',
+                borderUpColor: '#e74c3c', borderDownColor: '#27ae60',
+                wickUpColor: '#e74c3c', wickDownColor: '#27ae60',
+            });
+
+            volumeSeries = chart.addHistogramSeries({
+                priceFormat: { type: 'volume' },
+                priceScaleId: '',
+            });
+            volumeSeries.priceScale().applyOptions({
+                scaleMargins: { top: 0.8, bottom: 0 },
+            });
+
+            const ro = new ResizeObserver(() => {
+                chart.applyOptions({ width: wrapper.clientWidth, height: wrapper.clientHeight });
+            });
+            ro.observe(wrapper);
+        }
+
+        async function loadData(period) {
+            currentPeriod = period;
+            setActivePeriod(period);
+            document.getElementById('chart-loading').style.display = 'flex';
+            document.getElementById('chart-error').style.display = 'none';
+
+            try {
+                const resp = await fetch(`/api/price-history/?ticker=${encodeURIComponent(TICKER)}&market=${encodeURIComponent(MARKET)}&period=${period}`);
+                if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || `HTTP ${resp.status}`); }
+                const data = await resp.json();
+
+                if (!data.records || data.records.length === 0) {
+                    document.getElementById('chart-loading').style.display = 'none';
+                    const el = document.getElementById('chart-error');
+                    el.textContent = '無資料'; el.style.display = 'flex';
+                    return;
+                }
+
+                if (data.company_name) {
+                    document.getElementById('embed-title').textContent = data.company_name + ' (' + TICKER + ')';
+                }
+
+                // Change info
+                const first = data.records[0], last = data.records[data.records.length - 1];
+                if (first.close && last.close) {
+                    const pct = ((last.close - first.close) / first.close * 100);
+                    const el = document.getElementById('embed-change');
+                    el.textContent = fmt(last.close) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)';
+                    el.className = 'change ' + (pct >= 0 ? 'positive' : 'negative');
+                }
+
+                if (!chart) initChart();
+                document.getElementById('chart-loading').style.display = 'none';
+
+                const candles = data.records.filter(r => r.open != null && r.close != null).map(r => ({
+                    time: r.date, open: r.open, high: r.high, low: r.low, close: r.close
+                }));
+                const volumes = data.records.filter(r => r.volume != null && r.close != null && r.open != null).map(r => ({
+                    time: r.date, value: r.volume,
+                    color: r.close >= r.open ? 'rgba(231,76,60,0.4)' : 'rgba(39,174,96,0.4)',
+                }));
+
+                candleSeries.setData(candles);
+                volumeSeries.setData(volumes);
+                chart.timeScale().fitContent();
+            } catch (e) {
+                document.getElementById('chart-loading').style.display = 'none';
+                const el = document.getElementById('chart-error');
+                el.textContent = '載入失敗: ' + e.message; el.style.display = 'flex';
+            }
+        }
+
+        document.getElementById('period-selector').addEventListener('click', (e) => {
+            const btn = e.target.closest('.period-btn');
+            if (btn) loadData(btn.dataset.period);
+        });
+
+        loadData(currentPeriod);
+    })();
+    </script>
+</body>
+</html>

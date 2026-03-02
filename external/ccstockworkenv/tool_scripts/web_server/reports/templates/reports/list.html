@@ -1,0 +1,48 @@
+{% extends 'reports/base.html' %}
+
+{% block content %}
+<div class="report-list">
+    <div style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+        <p style="font-size: 1.1em; color: #2c3e50; margin: 0;">
+            共 <strong>{{ total_count }}</strong> 份報告
+        </p>
+        <a href="{% url 'dashboard' %}" class="btn btn-back" style="margin: 0;">← Dashboard</a>
+    </div>
+
+    {% if reports %}
+        {% for report in reports %}
+        <div class="report-card" style="background: white; padding: 20px; margin-bottom: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.3em; margin-bottom: 12px; color: #2c3e50;">
+                {{ report.display_name }}
+            </h2>
+            <p class="meta" style="margin-bottom: 16px;">
+                📅 {{ report.date|date:"Y年m月d日 H:i" }}
+                <span class="badge" style="margin-left: 8px;">{{ report.type }}</span>
+            </p>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                {% if report.html_path %}
+                <a href="{% url 'report_detail' report.url_slug %}" class="btn">查看報告 →</a>
+                {% elif report.md_path %}
+                <a href="{% url 'report_detail' report.url_slug %}" class="btn">查看報告 (Markdown) →</a>
+                {% else %}
+                <span style="color: #e74c3c; font-size: 0.9em;">❌ 檔案不存在</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div style="background: white; padding: 40px; text-align: center; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <p style="color: #95a5a6; font-size: 1.1em;">目前尚無報告</p>
+            <p style="color: #bdc3c7; font-size: 0.9em; margin-top: 8px;">使用 /gen_report 指令產生報告</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    @media (max-width: 768px) {
+        .report-card h2 {
+            font-size: 1.1em !important;
+        }
+    }
+</style>
+{% endblock %}

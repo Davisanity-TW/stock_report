@@ -1,0 +1,11 @@
+[project]
+name = "send-mail"
+version = "0.1.0"
+description = "Send emails via Mailgun API"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+send_mail = "send_mail:main"

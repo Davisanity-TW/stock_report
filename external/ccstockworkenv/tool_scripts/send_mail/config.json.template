@@ -1,0 +1,8 @@
+{
+    "MAILGUN_API_KEY": "your-mailgun-api-key",
+    "MAILGUN_DOMAIN": "your-mailgun-domain.mailgun.org",
+    "FROM_EMAIL": "your-sender@your-domain.mailgun.org",
+    "to_emails": [
+        "recipient1@example.com"
+    ]
+}

@@ -36,7 +36,8 @@ const sections = [
   { key: 'us', title: '美股（US）' },
   { key: 'youtube', title: 'YT-澔哥' },
   { key: 'guai', title: '股癌' },
-  { key: 'finance_news', title: '財經新聞快報' }
+  { key: 'finance_news', title: '財經新聞快報' },
+  { key: 'ccstock', title: 'CCStockWorkEnv' }
 ]
 
 for (const s of sections) {
