@@ -136,6 +136,22 @@ def _demote_headings(md: str, base_level: int = 4) -> str:
     return "".join(out_lines)
 
 
+def _normalize_md_tables(md: str) -> str:
+    """Fix common table formatting issues that break VitePress rendering.
+
+    Currently normalizes accidental double pipes ("||") in table rows.
+    Only touches lines that look like markdown table lines.
+    """
+
+    fixed: list[str] = []
+    for ln in md.splitlines(True):
+        if ln.lstrip().startswith("|") and "||" in ln:
+            while "||" in ln:
+                ln = ln.replace("||", "|")
+        fixed.append(ln)
+    return "".join(fixed)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ticker", required=True)
@@ -174,6 +190,7 @@ def main() -> None:
     if raw_lines and raw_lines[0].startswith("# "):
         raw_lines = raw_lines[1:]
     body_md = _demote_headings("".join(raw_lines), base_level=4)
+    body_md = _normalize_md_tables(body_md)
 
     # Build ~500字摘要（預設更詳盡）
     # Note: 字數為近似值（偏 450~650 字），避免過度精算增加 token。
