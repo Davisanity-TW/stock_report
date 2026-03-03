@@ -29,7 +29,7 @@ export default defineConfig({
       { text: 'YT-澔哥', link: '/reports/youtube/' },
       { text: '股癌', link: '/reports/guai/' },
       { text: '財經新聞快報', link: '/reports/finance_news/' },
-      { text: 'CCStockWorkEnv', link: '/reports/ccstock/' }
+      { text: 'CC股票研究工具', link: '/reports/analysis/' }
     ],
     sidebar: [
       {
@@ -57,8 +57,8 @@ export default defineConfig({
         items: makeItems('reports/finance_news', 'reports/finance_news', 30)
       },
       {
-        text: 'CCStockWorkEnv',
-        items: makeItems('reports/ccstock', 'reports/ccstock', 30)
+        text: 'CC股票研究工具',
+        items: makeItems('reports/analysis', 'reports/analysis', 60)
       }
     ]
   }

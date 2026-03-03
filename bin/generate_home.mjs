@@ -37,7 +37,7 @@ const targets = {
   us: join(docsDir, 'reports', 'us'),
   youtube: join(docsDir, 'reports', 'youtube'),
   finance_news: join(docsDir, 'reports', 'finance_news'),
-  ccstock: join(docsDir, 'reports', 'ccstock'),
+  analysis: join(docsDir, 'reports', 'analysis'),
   moltbook: join(docsDir, 'reports', 'moltbook', 'reports')
 }
 
@@ -46,7 +46,7 @@ const latest = {
   us: latestMdName(targets.us),
   youtube: latestMdName(targets.youtube),
   finance_news: latestMdName(targets.finance_news),
-  ccstock: latestMdName(targets.ccstock),
+  analysis: latestMdName(targets.analysis),
   moltbook: latestMoltbook(targets.moltbook)
 }
 
@@ -59,7 +59,7 @@ lines.push(`- 台股（TW）：${latest.tw ? `[./reports/tw/${latest.tw}](./repo
 lines.push(`- 美股（US）：${latest.us ? `[./reports/us/${latest.us}](./reports/us/${latest.us})` : '（尚無資料）'}`)
 lines.push(`- YT-澔哥：${latest.youtube ? `[./reports/youtube/${latest.youtube}](./reports/youtube/${latest.youtube})` : '（尚無資料）'}`)
 lines.push(`- 財經新聞快報：${latest.finance_news ? `[./reports/finance_news/${latest.finance_news}](./reports/finance_news/${latest.finance_news})` : '（尚無資料）'}`)
-lines.push(`- CCStockWorkEnv：${latest.ccstock ? `[./reports/ccstock/${latest.ccstock}](./reports/ccstock/${latest.ccstock})` : '（尚無資料）'}`)
+lines.push(`- CC股票研究工具：${latest.analysis ? `[./reports/analysis/${latest.analysis}](./reports/analysis/${latest.analysis})` : '（尚無資料）'}`)
 lines.push(
   `- Moltbook：${
     latest.moltbook
@@ -74,7 +74,7 @@ lines.push('- 台股（TW）列表：`/reports/tw/`')
 lines.push('- 美股（US）列表：`/reports/us/`')
 lines.push('- YT-澔哥 列表：`/reports/youtube/`')
 lines.push('- 財經新聞快報 列表：`/reports/finance_news/`')
-lines.push('- CCStockWorkEnv 列表：`/reports/ccstock/`')
+lines.push('- CC股票研究工具 列表：`/reports/analysis/`')
 lines.push('- Moltbook 列表：`/reports/moltbook/reports/`')
 lines.push('')
 lines.push('')

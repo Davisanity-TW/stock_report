@@ -37,7 +37,12 @@ const sections = [
   { key: 'youtube', title: 'YT-澔哥' },
   { key: 'guai', title: '股癌' },
   { key: 'finance_news', title: '財經新聞快報' },
-  { key: 'ccstock', title: 'CCStockWorkEnv' }
+
+  // New name + location
+  { key: 'analysis', title: 'CC股票研究工具' },
+
+  // Legacy (kept for backward compatibility / old files)
+  { key: 'ccstock', title: 'CCStockWorkEnv（legacy）' }
 ]
 
 for (const s of sections) {
