@@ -6,6 +6,7 @@
 - 美股（US）：[./reports/us/index](./reports/us/index)
 - YT-澔哥：[./reports/youtube/index](./reports/youtube/index)
 - 財經新聞快報：[./reports/finance_news/index](./reports/finance_news/index)
+- CC股票研究工具：[./reports/analysis/index](./reports/analysis/index)
 - Moltbook：[./reports/moltbook/reports/202602/02-01](./reports/moltbook/reports/202602/02-01)
 
 列表：
@@ -14,6 +15,7 @@
 - 美股（US）列表：`/reports/us/`
 - YT-澔哥 列表：`/reports/youtube/`
 - 財經新聞快報 列表：`/reports/finance_news/`
+- CC股票研究工具 列表：`/reports/analysis/`
 - Moltbook 列表：`/reports/moltbook/reports/`
 
 
