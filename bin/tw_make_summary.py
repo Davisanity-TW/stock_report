@@ -141,25 +141,31 @@ def main():
     def _parse_fmtqik(cache: dict, day_str: str):
         """Best-effort parse for TWSE afterTrading/FMTQIK response.
 
-        Expected (cache):
-          {
-            "data": {
-              "fields": ["日期", ..., "發行量加權股價指數", "漲跌點數"],
-              "data": [["115/02/26", ..., "35414.49", "1.42"], ...]
-            }
-          }
+        We accept multiple cache shapes:
+        - Direct TWSE payload: {"fields": [...], "data": [[...], ...]}
+        - TWSE wrapper: {"data": {"fields": [...], "data": [[...], ...]}}
+        - Our fetch wrapper: {"ok": true, "payload": <TWSE payload>}
+
+        TWSE fields should include:
+          - "日期"
+          - "發行量加權股價指數"
+          - "漲跌點數"
         """
         try:
             gdate = dt.date.fromisoformat(day_str)
         except Exception:
             return None, None, None, "bad_date"
 
-        # Two shapes seen in the wild:
-        # 1) raw: {stat, fields:[...], data:[[...]]}
-        # 2) wrapped: {data:{fields:[...], data:[[...]]}}
         if not isinstance(cache, dict):
             return None, None, None, "missing:data"
 
+        # Unwrap our fetch wrapper if present
+        if isinstance(cache.get("payload"), dict):
+            cache = cache["payload"]
+
+        # Two shapes seen in the wild:
+        # 1) raw: {stat, fields:[...], data:[[...]]}
+        # 2) wrapped: {data:{fields:[...], data:[[...]]}}
         if isinstance(cache.get("fields"), list) and isinstance(cache.get("data"), list):
             fields = cache.get("fields") or []
             rows = cache.get("data") or []
