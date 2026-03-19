@@ -199,8 +199,12 @@ def main() -> None:
     s.append(
         f"目前股價 {quote.price:.2f} 元（{quote.change:+.2f} / {quote.change_pct:+.2f}%），日內區間 {quote.low:.2f}–{quote.high:.2f}，成交量 {_fmt_vol_shares(quote.volume)}，顯示短線波動偏大。"
     )
+    pe = metrics.get("pe_ratio")
+    pb = metrics.get("pb_ratio")
+    pe_s = "N/A" if pe is None else f"{pe:.1f}"
+    pb_s = "N/A" if pb is None else f"{pb:.2f}"
     s.append(
-        f"估值面 P/E 約 {metrics.get('pe_ratio'):.1f}、P/B 約 {metrics.get('pb_ratio'):.2f}；股利殖利率約 {_fmt_pct(metrics.get('dividend_yield'))}。"
+        f"估值面 P/E 約 {pe_s}、P/B 約 {pb_s}；股利殖利率約 {_fmt_pct(metrics.get('dividend_yield'))}。"
     )
     s.append(
         f"獲利結構方面，毛利率約 {_fmt_pct(metrics.get('gross_margin'))}、營業利益率約 {_fmt_pct(metrics.get('operating_margin'))}、淨利率約 {_fmt_pct(metrics.get('net_margin'))}；在面板景氣循環下，利潤率的回升/下滑往往領先股價評價。"
