@@ -25,7 +25,9 @@ from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
 
-STOOQ_BASE = "https://stooq.com/q/d/l/?i=d&s="
+# NOTE: Stooq daily history endpoint (/q/d/l) may return empty responses from some hosts.
+# We use the quote endpoint (/q/l) which has been more reliable and also provides Prev close.
+STOOQ_QUOTE_BASE = "https://stooq.com/q/l/?f=sd2t2ohlcvp&h&e=csv&s="
 VIX_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
 
 
@@ -56,34 +58,43 @@ def _http_get(url: str, timeout: int = 20) -> str:
 
 
 def _parse_stooq(symbol: str, wanted_date: str | None) -> Bar | None:
-    # symbol must be like qqq.us
-    text = _http_get(STOOQ_BASE + symbol)
-    if text.strip().startswith("No data"):
+    """Fetch Stooq quote row.
+
+    We intentionally use /q/l (quote) instead of /q/d/l (daily history), because
+    the history endpoint may return empty bodies from some environments.
+
+    Output provides Date, Close, Volume and Prev close.
+
+    Note: wanted_date is kept for compatibility with callers, but is best-effort.
+    If Stooq returns a different Date than wanted_date, we still return it.
+    """
+    # symbol examples: qqq.us, nvda.us, xauusd, btcusd
+    text = _http_get(STOOQ_QUOTE_BASE + symbol)
+    if not text.strip() or text.strip().startswith("No data"):
         return None
+
     rows = list(csv.DictReader(text.splitlines()))
     if not rows:
         return None
 
-    # Pick row: wanted_date if present else last row.
-    idx = None
-    if wanted_date:
-        for i, r in enumerate(rows):
-            if r.get("Date") == wanted_date:
-                idx = i
-                break
-    if idx is None:
-        idx = len(rows) - 1
+    r = rows[0]
+    # If Stooq returns placeholder like "N/A", treat as missing.
+    if (r.get("Close") or "").strip().upper() in {"", "N/A", "NA"}:
+        return None
 
-    r = rows[idx]
     close = float(r["Close"])
-    vol = r.get("Volume")
-    volume = int(float(vol)) if vol not in (None, "") else None
 
     prev_close = None
-    if idx - 1 >= 0:
-        prev_close = float(rows[idx - 1]["Close"])
+    prev = (r.get("Prev") or "").strip()
+    if prev and prev.upper() not in {"N/A", "NA"}:
+        prev_close = float(prev)
 
-    return Bar(date=r["Date"], close=close, prev_close=prev_close, volume=volume)
+    volume = None
+    vol = (r.get("Volume") or "").strip()
+    if vol and vol.upper() not in {"N/A", "NA"}:
+        volume = int(float(vol))
+
+    return Bar(date=r.get("Date") or (wanted_date or ""), close=close, prev_close=prev_close, volume=volume)
 
 
 def _parse_cboe_vix(wanted_date: str | None) -> Bar | None:
