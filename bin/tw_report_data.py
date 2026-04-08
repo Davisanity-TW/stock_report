@@ -28,6 +28,8 @@ import datetime as dt
 import json
 import math
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -36,17 +38,43 @@ import urllib.request
 # If a code exists in TPEx close quotes for the day, treat it as TPEx.
 
 
-def http_get_json(url: str, timeout: int = 30):
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; stock_report/1.0)"
-        },
-        method="GET",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = resp.read()
-    return json.loads(data.decode("utf-8"))
+def http_get_json(url: str, timeout: int = 30, retries: int = 3, backoff_s: float = 1.0):
+    """GET JSON with small retry/backoff.
+
+    TPEx OpenAPI intermittently returns HTTP 520/5xx. We treat those as
+    transient and retry so the daily pipeline doesn't hard-fail.
+    """
+    last_err = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; stock_report/1.0)"
+                },
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = resp.read()
+            return json.loads(data.decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            last_err = e
+            # Retry on common transient errors.
+            if e.code in {429, 500, 502, 503, 504, 520} and attempt < retries - 1:
+                time.sleep(backoff_s * (2**attempt))
+                continue
+            raise
+        except urllib.error.URLError as e:
+            last_err = e
+            if attempt < retries - 1:
+                time.sleep(backoff_s * (2**attempt))
+                continue
+            raise
+        except Exception as e:
+            last_err = e
+            raise
+    # Should not reach here, but keep type-checkers happy.
+    raise RuntimeError(str(last_err) if last_err else "http_get_json failed")
 
 
 def to_int(s: str) -> int:
@@ -159,7 +187,12 @@ def twse_t86(gdate: dt.date):
 
 def tpex_close_quotes(gdate: dt.date):
     url = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
-    rows = http_get_json(url)
+    try:
+        rows = http_get_json(url)
+    except Exception:
+        # Best-effort: if TPEx is down, don't crash the whole pipeline.
+        return {}
+
     # Filter by date (115MMDD)
     roc = f"{gdate.year-1911:03d}{gdate.month:02d}{gdate.day:02d}"
     out = {}
@@ -199,7 +232,12 @@ def tpex_close_quotes(gdate: dt.date):
 
 def tpex_3insti(gdate: dt.date):
     url = "https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading"
-    rows = http_get_json(url)
+    try:
+        rows = http_get_json(url)
+    except Exception:
+        # Best-effort: TPEx can intermittently 520; keep pipeline running.
+        return {}
+
     roc = f"{gdate.year-1911:03d}{gdate.month:02d}{gdate.day:02d}"
     out = {}
 
