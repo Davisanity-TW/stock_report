@@ -317,7 +317,7 @@ def main() -> int:
     ap.add_argument("--top", type=int, default=5, help="Top N similar docs to report")
     ap.add_argument("--block", type=float, default=0.86, help="Overall similarity >= block => exit 1")
     ap.add_argument("--warn", type=float, default=0.78, help="Overall similarity >= warn => exit 0 but warn")
-    ap.add_argument("--weights", default="0.30,0.30,0.40", help="lex,struct,thesis weights")
+    ap.add_argument("--weights", default="0.45,0.05,0.50", help="lex,struct,thesis weights")
     ap.add_argument("--out-json", default="tmp/similarity_report.json")
     ap.add_argument("--out-md", default="tmp/similarity_report.md")
     args = ap.parse_args()

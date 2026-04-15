@@ -33,6 +33,96 @@ def pick(items, n=8):
     return sorted(items, key=key, reverse=True)[:n]
 
 
+def _title_tokens(title: str) -> set[str]:
+    """Tokenize title for clustering similar stories.
+
+    - ascii words length>=3
+    - ignore very common news words
+    """
+    t = (title or "").lower()
+    t = re.sub(r"https?://\S+", " ", t)
+    t = re.sub(r"[^a-z0-9\s]", " ", t)
+    words = [w for w in t.split() if len(w) >= 3]
+    stop = {
+        "live", "update", "updates", "today", "stock", "stocks", "market", "markets",
+        "news", "says", "say", "said", "report", "reports", "amid", "after", "over",
+        "with", "from", "into", "this", "that", "will", "would", "could",
+        "company", "companies", "group", "shares", "share",
+    }
+    return {w for w in words if w not in stop and not w.isdigit()}
+
+
+def _set_sim(a: set[str], b: set[str]) -> float:
+    # If we can't extract tokens (e.g., pure CJK titles), do not merge here.
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+KEY_PAIRS = [
+    {"amazon", "globalstar"},
+    {"microsoft", "openai"},
+    {"apple", "iphone"},
+    {"tesla", "musk"},
+]
+
+
+def merge_similar_items(items: list[dict], threshold: float = 0.55) -> list[dict]:
+    """Merge near-duplicate stories (same event, different outlets).
+
+    This is a second-stage safety net beyond exact-url/title-sim dedup.
+
+    Strategy:
+    - greedy clustering over sorted items (newer/higher weight first)
+    - if title token Jaccard >= threshold: merge links/sources into representative
+    """
+    out: list[dict] = []
+
+    def sort_key(it):
+        return (it.get("published_at") or "", it.get("weight") or 0)
+
+    for it in sorted(items, key=sort_key, reverse=True):
+        title = (it.get("title") or it.get("headline") or "").strip()
+        toks = _title_tokens(title)
+
+        merged = False
+        for rep in out:
+            rep_title = (rep.get("title") or rep.get("headline") or "").strip()
+            rep_toks = rep.setdefault("_title_tokens", _title_tokens(rep_title))
+            sim = _set_sim(toks, rep_toks)
+            inter = toks & rep_toks
+
+            strong_entity_match = any(pair.issubset(inter) for pair in KEY_PAIRS)
+
+            # Merge when we have enough shared "entity" tokens.
+            # - Either overall token overlap is decent, OR we detect a strong entity pair match.
+            if len(inter) >= 2 and (sim >= threshold or strong_entity_match):
+                # merge links
+                rep.setdefault("alt_links", [])
+                link = it.get("link")
+                if link and link != rep.get("link") and link not in rep["alt_links"]:
+                    rep["alt_links"].append(link)
+
+                # merge sources
+                rep.setdefault("alt_sources", [])
+                src = it.get("source")
+                if src and src != rep.get("source") and src not in rep["alt_sources"]:
+                    rep["alt_sources"].append(src)
+
+                merged = True
+                break
+
+        if not merged:
+            out.append(dict(it))
+
+    # strip helper field
+    for it in out:
+        if "_title_tokens" in it:
+            del it["_title_tokens"]
+
+    return out
+
+
 def extract_numbers(text: str):
     if not text:
         return []
@@ -67,6 +157,10 @@ def main() -> None:
     tw_items = (regions.get("taiwan") or {}).get("items") or []
     gl_items = (regions.get("global") or {}).get("items") or []
 
+    # Second-stage merge to avoid "same event, many outlets" spam.
+    tw_items = merge_similar_items(tw_items)
+    gl_items = merge_similar_items(gl_items)
+
     tw = pick(tw_items, args.max_tw)
     gl = pick(gl_items, args.max_global)
 
@@ -74,25 +168,33 @@ def main() -> None:
 
     print(f"【財經新聞快報｜台灣＋國際】{now}（回顧近 5 小時｜RSS 去重）\n")
 
-    print("## 台灣（最多 8 則）")
-    for i, it in enumerate(tw, 1):
+    def render_item(i: int, it: dict) -> None:
         title = (it.get("title") or it.get("headline") or "").strip()
         summ = one_line(it.get("raw_summary") or it.get("summary") or "")
         nums = extract_numbers(title + " " + summ)
         numtxt = ("；關鍵數字：" + ", ".join(nums)) if nums else ""
+
         print(f"{i}) **{title}**")
         print(f"- 重點：{summ if summ else '（摘要缺）'}{numtxt}")
-        print(f"- 原文：[link]({it.get('link')})｜來源：{it.get('source')}\n")
+        print(f"- 原文：[link]({it.get('link')})｜來源：{it.get('source')}")
+
+        extras = []
+        if it.get("alt_sources"):
+            extras.append("其他來源：" + " / ".join(it.get("alt_sources") or []))
+        if it.get("alt_links"):
+            extras.append("延伸閱讀：" + " ".join([f"[link]({u})" for u in (it.get("alt_links") or [])[:5]]))
+        if extras:
+            print("- " + "｜".join(extras))
+
+        print("")
+
+    print("## 台灣（最多 8 則）")
+    for i, it in enumerate(tw, 1):
+        render_item(i, it)
 
     print("## 國際（最多 8 則）")
     for i, it in enumerate(gl, 1):
-        title = (it.get("title") or it.get("headline") or "").strip()
-        summ = one_line(it.get("raw_summary") or it.get("summary") or "")
-        nums = extract_numbers(title + " " + summ)
-        numtxt = ("；關鍵數字：" + ", ".join(nums)) if nums else ""
-        print(f"{i}) **{title}**")
-        print(f"- 重點：{summ if summ else '（摘要缺）'}{numtxt}")
-        print(f"- 原文：[link]({it.get('link')})｜來源：{it.get('source')}\n")
+        render_item(i, it)
 
     print("---")
     print("### 今日主軸（3 點）")
