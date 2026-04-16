@@ -165,6 +165,14 @@ def jaccard(a: Iterable[str], b: Iterable[str]) -> float:
 
 # --------------------------- thesis extraction + embedding ---------------------------
 
+def _extract_date_yyyymmdd(text: str) -> str:
+    """Extract YYYY-MM-DD from text (supports YYYY/MM/DD or YYYY-MM-DD)."""
+    m = re.search(r"(20\d{2})[/-](\d{2})[/-](\d{2})", text)
+    if not m:
+        return ""
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
+
 def extract_thesis(md: str) -> str:
     """Heuristic thesis extraction (offline).
 
@@ -343,6 +351,7 @@ def main() -> int:
         weights = (0.3, 0.3, 0.4)
 
     draft_thesis = extract_thesis(strip_code_blocks(draft_md))
+    draft_date = _extract_date_yyyymmdd(draft_thesis)
 
     scored: list[Score] = []
     for p in files:
@@ -350,6 +359,15 @@ def main() -> int:
         if p.resolve() == draft_path:
             continue
         other_md = read_text(p)
+
+        # Option (2): allow multiple intraday finance_news updates.
+        # If the other doc looks like the same calendar date, ignore it in corpus comparison.
+        if args.section.strip().lower() == "finance_news" and draft_date:
+            other_thesis = extract_thesis(strip_code_blocks(other_md))
+            other_date = _extract_date_yyyymmdd(other_thesis)
+            if other_date and other_date == draft_date:
+                continue
+
         lex, struct, th, overall, other_thesis = score_pair(draft_md, other_md, weights)
         scored.append(Score(path=str(p), lexical=lex, structural=struct, thesis=th, overall=overall, thesis_text=other_thesis))
 
