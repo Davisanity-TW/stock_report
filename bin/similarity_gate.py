@@ -270,7 +270,13 @@ class Score:
     thesis_text: str
 
 
-def score_pair(draft_md: str, other_md: str, weights: tuple[float, float, float]) -> tuple[float, float, float, float, str]:
+def score_pair(
+    draft_md: str,
+    other_md: str,
+    weights: tuple[float, float, float],
+    *,
+    section: str = "",
+) -> tuple[float, float, float, float, str]:
     w_lex, w_struct, w_thesis = weights
 
     draft_clean = strip_code_blocks(draft_md)
@@ -287,7 +293,17 @@ def score_pair(draft_md: str, other_md: str, weights: tuple[float, float, float]
     # Thesis
     draft_thesis = extract_thesis(draft_clean)
     other_thesis = extract_thesis(other_clean)
-    thesis = cosine(hashed_embedding(draft_thesis), hashed_embedding(other_thesis)) if (draft_thesis and other_thesis) else 0.0
+
+    # Option (2) continuation for finance_news: avoid "template headline" dominating similarity.
+    # If thesis is just the fixed "【財經新聞快報｜...】YYYY/MM/DD HH:MM（回顧...）" pattern,
+    # it is expected to be near-identical day-to-day. Treat thesis similarity as 0 and let lexical/structure govern.
+    if section.strip().lower() == "finance_news":
+        if draft_thesis.startswith("【財經新聞快報") and other_thesis.startswith("【財經新聞快報"):
+            thesis = 0.0
+        else:
+            thesis = cosine(hashed_embedding(draft_thesis), hashed_embedding(other_thesis)) if (draft_thesis and other_thesis) else 0.0
+    else:
+        thesis = cosine(hashed_embedding(draft_thesis), hashed_embedding(other_thesis)) if (draft_thesis and other_thesis) else 0.0
 
     overall = (w_lex * lexical) + (w_struct * structural) + (w_thesis * thesis)
     return lexical, structural, thesis, overall, other_thesis
@@ -368,7 +384,7 @@ def main() -> int:
             if other_date and other_date == draft_date:
                 continue
 
-        lex, struct, th, overall, other_thesis = score_pair(draft_md, other_md, weights)
+        lex, struct, th, overall, other_thesis = score_pair(draft_md, other_md, weights, section=args.section)
         scored.append(Score(path=str(p), lexical=lex, structural=struct, thesis=th, overall=overall, thesis_text=other_thesis))
 
     scored.sort(key=lambda x: x.overall, reverse=True)
