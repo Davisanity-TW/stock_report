@@ -12,14 +12,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DATE="${1:-}"
+
+# Default to *today in Asia/Taipei* to avoid stale tmp/tw-latest-date.txt causing
+# the weekly file to be written under the wrong ISO week.
 if [[ -z "${DATE}" ]]; then
-  if [[ -f tmp/tw-latest-date.txt ]]; then
-    DATE="$(cat tmp/tw-latest-date.txt | tr -d ' \t\r\n')"
-  fi
+  DATE="$(TZ=Asia/Taipei date +%F)"
 fi
 
+# If caller explicitly passes DATE, trust it.
+# (We intentionally do NOT auto-read tmp/tw-latest-date.txt anymore.)
+
 if [[ -z "${DATE}" ]]; then
-  echo "missing DATE (pass YYYY-MM-DD or ensure tmp/tw-latest-date.txt exists)" >&2
+  echo "missing DATE (pass YYYY-MM-DD)" >&2
   exit 2
 fi
 
