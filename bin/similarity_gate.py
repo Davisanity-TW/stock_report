@@ -205,19 +205,25 @@ def extract_thesis(md: str) -> str:
             h1_idx = i
             break
     if h1_idx is not None:
-        for j in range(h1_idx + 1, min(h1_idx + 40, len(lines))):
+        for j in range(h1_idx + 1, min(h1_idx + 80, len(lines))):
             x = lines[j].strip()
             if not x or x.startswith("#") or x.startswith("-"):
                 continue
+            # Skip markdown tables (common fixed headers) which create false positives.
+            if x.startswith("|"):
+                continue
             x = normalize_ws(x)
             if len(x) >= 12:
-                return x[:80]
+                return x[:160]
 
-    # Fallback: first non-empty
+    # Fallback: first meaningful non-empty line (skip headings + table rows)
     for ln in lines:
         x = normalize_ws(ln)
-        if x and not x.startswith("#"):
-            return x[:80]
+        if not x:
+            continue
+        if x.startswith("#") or x.startswith("|"):
+            continue
+        return x[:160]
 
     return ""
 
