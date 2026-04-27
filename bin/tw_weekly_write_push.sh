@@ -54,9 +54,19 @@ cp tmp/tw-summary.md "${BLOCK}"
   echo
 } >> "${BLOCK}"
 
+# Keep git ops non-interactive for cron
+export GIT_ASKPASS="${GIT_ASKPASS:-/home/ubuntu/clawd/bin/git_askpass_github.sh}"
+export GIT_TERMINAL_PROMPT=0
+
+# Avoid push conflicts
+git stash push -u -m "autostash before TW weekly pull" >/dev/null 2>&1 || true
+"$GIT_ASKPASS" >/dev/null 2>&1 || true
+
+git pull --rebase
+
 python3 bin/md_upsert_daily_section.py --file "${WFILE}" --date "${DATE}" --content-file "${BLOCK}"
 node bin/sync_reports.mjs
 
-git add -A
+git add reports docs/reports bin/tw_weekly_write_push.sh
 git commit -m "TW weekly write ${DATE}" || true
 git push
