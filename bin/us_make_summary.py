@@ -87,7 +87,13 @@ def main():
     lines: List[str] = []
     lines.append("# 美股收盤研究摘要（快取）\n")
     lines.append("## A) 追蹤清單快覽")
-    lines.append("- 下方表格已包含：**收盤價 / 漲跌 / 成交量**。")
+    # 第一行會被 similarity gate 當作 thesis，務必帶入『當日特徵』避免模板化。
+    if qqq and isinstance(qqq.get("chg_pct"), (int, float)):
+        lines.append(
+            f"- {args.date}：下方表格已包含 **收盤價 / 漲跌 / 成交量**；當日大盤代理(QQQ) 變動 {_fmt_pct(qqq.get('chg_pct'), 2)}。"
+        )
+    else:
+        lines.append(f"- {args.date}：下方表格已包含 **收盤價 / 漲跌 / 成交量**。")
     if qqq:
         lines.append(
             f"- 大盤代理（QQQ）：收 **{_fmt_num(qqq.get('close'), 2)}**，{_fmt_num(qqq.get('chg'), 2)}（{_fmt_pct(qqq.get('chg_pct'), 2)}），量 **{_fmt_int(qqq.get('volume'))}**。"
