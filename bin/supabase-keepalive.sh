@@ -5,7 +5,7 @@ set -euo pipefail
 # Reads publishable key from workspace secrets to avoid hardcoding.
 
 PROJECT_URL="https://whjkvgjihtnvcgtsygst.supabase.co"
-FUNCTION_NAME="keepalive"   # TODO: change if your Edge Function name differs
+FUNCTION_NAME="telegram-add-item"   # Existing deployed Edge Function (used as keepalive ping)
 
 KEY_FILE="/home/ubuntu/clawd/secrets/supabase_publishable_key.txt"
 
