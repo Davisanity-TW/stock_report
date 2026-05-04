@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Fetch US market daily close data (free sources).
 
-- Equities/ETFs: Stooq daily CSV
-  https://stooq.com/q/d/l/?s=qqq.us&i=d
+- Equities/ETFs + spot proxies (gold/silver/btc): Stooq quote CSV
+  https://stooq.com/q/l/?f=sd2t2ohlcvp&h&e=csv&s=qqq.us
 
 - VIX: CBOE daily history CSV
   https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv
 
 Outputs JSON to stdout.
 
-Note: Date logic is intentionally simple. The caller can pass --date, or omit
-and let the script pick "latest available" from each source.
+Note: Some environments (notably AWS) observe Stooq returning HTTP 200 with an
+empty body. We retry those URLs via r.jina.ai proxy and extract the
+"Markdown Content:" section.
 """
 
 from __future__ import annotations
@@ -20,13 +21,13 @@ import csv
 import datetime as dt
 import json
 import sys
+import time
 import urllib.request
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
-
 # NOTE: Stooq daily history endpoint (/q/d/l) may return empty responses from some hosts.
-# We use the quote endpoint (/q/l) which has been more reliable and also provides Prev close.
+# We use the quote endpoint (/q/l) which also provides Prev close.
 STOOQ_QUOTE_BASE = "https://stooq.com/q/l/?f=sd2t2ohlcvp&h&e=csv&s="
 VIX_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
 
@@ -51,60 +52,89 @@ class Bar:
         return (self.close / self.prev_close - 1.0) * 100.0
 
 
-def _http_get(url: str, timeout: int = 20) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "clawdbot/stock_report"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+def _http_get(url: str, timeout: int = 12) -> str:
+    """HTTP GET.
+
+    For Stooq URLs we *prefer* going through r.jina.ai, because some hosts see
+    HTTP 200 + empty body from stooq.com.
+    """
+
+    def _fetch(u: str) -> str:
+        req = urllib.request.Request(u, headers={"User-Agent": "clawdbot/stock_report"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+
+    def _unwrap_jina(wrapped: str) -> str:
+        if "Markdown Content:" in wrapped:
+            return wrapped.split("Markdown Content:", 1)[1].lstrip()
+        return wrapped
+
+    # Stooq: go via proxy first
+    if url.startswith("https://stooq.com/"):
+        try:
+            return _unwrap_jina(_fetch("https://r.jina.ai/" + url))
+        except Exception:
+            pass
+
+    # Default: direct then fallback
+    text = _fetch(url)
+    if text.strip():
+        return text
+
+    try:
+        return _unwrap_jina(_fetch("https://r.jina.ai/" + url))
+    except Exception:
+        return text
 
 
 def _parse_stooq(symbol: str, wanted_date: str | None) -> Bar | None:
-    """Fetch Stooq quote row.
+    """Fetch one Stooq quote row.
 
-    We intentionally use /q/l (quote) instead of /q/d/l (daily history), because
-    the history endpoint may return empty bodies from some environments.
-
-    Output provides Date, Close, Volume and Prev close.
-
-    Note: wanted_date is kept for compatibility with callers, but is best-effort.
-    If Stooq returns a different Date than wanted_date, we still return it.
+    symbol examples: qqq.us, nvda.us, xauusd, btcusd
     """
-    # symbol examples: qqq.us, nvda.us, xauusd, btcusd
-    text = _http_get(STOOQ_QUOTE_BASE + symbol)
+    # Stooq sometimes returns placeholder N/D intermittently; retry a couple times.
+    text = ""
+    for i in range(3):
+        text = _http_get(STOOQ_QUOTE_BASE + symbol)
+        if text.strip() and not text.strip().startswith("No data") and "N/D" not in text:
+            break
+        if i < 2:
+            time.sleep(0.4)
     if not text.strip() or text.strip().startswith("No data"):
         return None
 
-    rows = list(csv.DictReader(text.splitlines()))
+    # Normalize line endings; some proxies return CRLF.
+    rows = list(csv.DictReader(text.replace("\r", "").splitlines()))
     if not rows:
         return None
 
     r = rows[0]
-    # If Stooq returns placeholder like "N/A", treat as missing.
-    if (r.get("Close") or "").strip().upper() in {"", "N/A", "NA"}:
+    if (r.get("Close") or "").strip().upper() in {"", "N/A", "NA", "N/D"}:
         return None
 
     close = float(r["Close"])
 
     prev_close = None
     prev = (r.get("Prev") or "").strip()
-    if prev and prev.upper() not in {"N/A", "NA"}:
+    if prev and prev.upper() not in {"N/A", "NA", "N/D"}:
         prev_close = float(prev)
 
     volume = None
     vol = (r.get("Volume") or "").strip()
-    if vol and vol.upper() not in {"N/A", "NA"}:
+    if vol and vol.upper() not in {"N/A", "NA", "N/D"}:
         volume = int(float(vol))
 
     return Bar(date=r.get("Date") or (wanted_date or ""), close=close, prev_close=prev_close, volume=volume)
 
 
 def _parse_cboe_vix(wanted_date: str | None) -> Bar | None:
-    text = _http_get(VIX_URL)
-    rows = list(csv.DictReader(text.splitlines()))
+    text = _http_get(VIX_URL, timeout=20)
+    # Normalize line endings.
+    rows = list(csv.DictReader(text.replace("\r", "").splitlines()))
     if not rows:
         return None
 
     # Column names: DATE, OPEN, HIGH, LOW, CLOSE
-    # Find wanted_date else last row.
     idx = None
     if wanted_date:
         for i, r in enumerate(rows):
@@ -121,16 +151,9 @@ def _parse_cboe_vix(wanted_date: str | None) -> Bar | None:
 
 
 def default_trade_date_et() -> str:
-    """Return ET calendar date string for 'latest available' close.
-
-    At Asia/Taipei 06:xx, ET is usually ~17:xx previous day, i.e. market has
-    already closed for that ET date.
-
-    We do a simple weekend shift; US holidays are not handled.
-    """
+    """Return ET calendar date string for 'latest available' close (weekend-adjusted)."""
     now_et = dt.datetime.now(ZoneInfo("America/New_York"))
     d = now_et.date()
-    # If weekend, shift back to Friday.
     if d.weekday() == 5:  # Sat
         d = d - dt.timedelta(days=1)
     elif d.weekday() == 6:  # Sun
@@ -141,24 +164,23 @@ def default_trade_date_et() -> str:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", help="Wanted trade date (YYYY-MM-DD). If omitted, use ET date and latest available per source.")
-    ap.add_argument("--tickers", default="QQQ,NVDA,AMD,QCOM,MRVL,TSLA,GOOG,AAPL,SNDK,MU,AVGO,PLTR,INTC",
-                    help="Comma-separated US tickers")
+    ap.add_argument(
+        "--tickers",
+        default="QQQ,NVDA,AMD,QCOM,MRVL,TSLA,GOOG,AAPL,SNDK,MU,AVGO,PLTR,INTC",
+        help="Comma-separated US tickers",
+    )
     args = ap.parse_args()
 
     wanted_date = args.date or default_trade_date_et()
 
     tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
-    # Stooq uses lowercase and .us suffix for US stocks
+
     def stooq_sym(t: str) -> str:
-        # Some tickers may be non-standard; still try.
         return t.lower() + ".us"
 
     out = {
         "asof_date": wanted_date,
-        "source": {
-            "stooq": "stooq.com",
-            "vix": VIX_URL,
-        },
+        "source": {"stooq": "stooq.com", "vix": VIX_URL},
         "tickers": {},
         "indicators": {},
     }
@@ -177,7 +199,6 @@ def main():
             "volume": bar.volume,
         }
 
-    # VIX
     vix_bar = _parse_cboe_vix(wanted_date)
     if vix_bar is None:
         out["indicators"]["VIX"] = {"ok": False, "error": "no data"}
@@ -190,7 +211,6 @@ def main():
             "chg_pct": vix_bar.chg_pct,
         }
 
-    # Gold/Silver/BTC from Stooq (as spot series)
     for name, sym in [("XAUUSD", "xauusd"), ("XAGUSD", "xagusd"), ("BTCUSD", "btcusd")]:
         bar = _parse_stooq(sym, wanted_date)
         if bar is None:
