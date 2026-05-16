@@ -52,7 +52,7 @@ class Bar:
         return (self.close / self.prev_close - 1.0) * 100.0
 
 
-def _http_get(url: str, timeout: int = 12) -> str:
+def _http_get(url: str, timeout: int = 3) -> str:
     """HTTP GET.
 
     For Stooq URLs we *prefer* going through r.jina.ai, because some hosts see
@@ -77,7 +77,11 @@ def _http_get(url: str, timeout: int = 12) -> str:
             pass
 
     # Default: direct then fallback
-    text = _fetch(url)
+    try:
+        text = _fetch(url)
+    except Exception:
+        text = ""
+
     if text.strip():
         return text
 
@@ -94,12 +98,10 @@ def _parse_stooq(symbol: str, wanted_date: str | None) -> Bar | None:
     """
     # Stooq sometimes returns placeholder N/D intermittently; retry a couple times.
     text = ""
-    for i in range(3):
+    for i in range(1):
         text = _http_get(STOOQ_QUOTE_BASE + symbol)
         if text.strip() and not text.strip().startswith("No data") and "N/D" not in text:
             break
-        if i < 2:
-            time.sleep(0.4)
     if not text.strip() or text.strip().startswith("No data"):
         return None
 
@@ -185,7 +187,15 @@ def main():
         "indicators": {},
     }
 
+    # Fail-fast guardrail: if upstream sources are unreachable, don't hang for minutes.
+    # When we exceed the budget, we stop fetching and let the caller keep last-good cache.
+    start = time.monotonic()
+    max_total_seconds = 30.0
+
     for t in tickers:
+        if time.monotonic() - start > max_total_seconds:
+            out["tickers"][t] = {"ok": False, "error": "timeout budget exceeded"}
+            continue
         bar = _parse_stooq(stooq_sym(t), wanted_date)
         if bar is None:
             out["tickers"][t] = {"ok": False, "error": "no data"}
@@ -199,7 +209,10 @@ def main():
             "volume": bar.volume,
         }
 
-    vix_bar = _parse_cboe_vix(wanted_date)
+    if time.monotonic() - start > max_total_seconds:
+        vix_bar = None
+    else:
+        vix_bar = _parse_cboe_vix(wanted_date)
     if vix_bar is None:
         out["indicators"]["VIX"] = {"ok": False, "error": "no data"}
     else:
@@ -212,6 +225,9 @@ def main():
         }
 
     for name, sym in [("XAUUSD", "xauusd"), ("XAGUSD", "xagusd"), ("BTCUSD", "btcusd")]:
+        if time.monotonic() - start > max_total_seconds:
+            out["indicators"][name] = {"ok": False, "error": "timeout budget exceeded"}
+            continue
         bar = _parse_stooq(sym, wanted_date)
         if bar is None:
             out["indicators"][name] = {"ok": False, "error": "no data"}
@@ -223,6 +239,19 @@ def main():
                 "chg": bar.chg,
                 "chg_pct": bar.chg_pct,
             }
+
+    # Guardrail: if *everything* failed, exit non-zero and print nothing.
+    # This prevents downstream cron steps from overwriting the last-good cache
+    # with an empty/NA framework payload.
+    ok_any = any((v or {}).get("ok") for v in out.get("tickers", {}).values()) or any(
+        (v or {}).get("ok") for v in out.get("indicators", {}).values()
+    )
+    if not ok_any:
+        print(
+            f"us_report_data.py: all sources returned no data (asof_date={wanted_date}); keep last-good cache",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
     json.dump(out, sys.stdout, ensure_ascii=False)
 
