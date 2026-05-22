@@ -97,7 +97,10 @@ def simhash64(tokens: Iterable[str]) -> int:
 
 
 def hamming64(a: int, b: int) -> int:
-    return (a ^ b).bit_count()
+    x = a ^ b
+    if hasattr(x, "bit_count"):
+        return x.bit_count()
+    return bin(x).count("1")
 
 
 def simhash_similarity(a: int, b: int) -> float:
