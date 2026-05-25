@@ -24,13 +24,158 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
+AI_KEYWORDS = [
+    "ai", "artificial intelligence", "generative ai", "genai", "agentic", "ai agent",
+    "openai", "anthropic", "chatgpt", "gemini", "copilot", "llm", "gpu", "tpu",
+    "accelerator", "data center", "datacenter", "server", "semiconductor", "chip",
+    "hbm", "asic", "cpo", "silicon photonics", "optical", "inference", "training",
+    "人工智慧", "生成式ai", "生成式 ai", "ai代理", "ai 代理", "算力", "資料中心",
+    "數據中心", "伺服器", "半導體", "晶片", "先進封裝", "矽光子", "光通訊",
+    "推論", "訓練", "機器人", "輝達", "黃仁勳",
+]
+
+STOCK_ALIASES = {
+    "NVDA": ["NVDA", "Nvidia", "NVIDIA", "輝達", "英偉達"],
+    "AMD": ["AMD", "超微"],
+    "AVGO": ["AVGO", "Broadcom", "博通"],
+    "TSM": ["TSM", "TSMC", "Taiwan Semiconductor", "台積電", "台積"],
+    "ASML": ["ASML", "艾司摩爾"],
+    "MU": ["MU", "Micron", "美光"],
+    "MRVL": ["MRVL", "Marvell", "邁威爾"],
+    "ARM": ["ARM", "Arm Holdings"],
+    "ANET": ["ANET", "Arista"],
+    "SMCI": ["SMCI", "Super Micro", "Supermicro", "美超微"],
+    "MSFT": ["MSFT", "Microsoft", "微軟"],
+    "GOOGL": ["GOOGL", "GOOG", "Alphabet", "Google", "谷歌"],
+    "AMZN": ["AMZN", "Amazon", "AWS", "亞馬遜"],
+    "META": ["META", "Meta", "臉書"],
+    "ORCL": ["ORCL", "Oracle", "甲骨文"],
+    "PLTR": ["PLTR", "Palantir"],
+    "AAPL": ["AAPL", "Apple", "蘋果"],
+    "TSLA": ["TSLA", "Tesla", "特斯拉"],
+    "2330": ["2330", "台積電", "台積"],
+    "2454": ["2454", "聯發科"],
+    "2382": ["2382", "廣達"],
+    "3231": ["3231", "緯創"],
+    "6669": ["6669", "緯穎"],
+    "2356": ["2356", "英業達"],
+    "2317": ["2317", "鴻海", "富士康"],
+    "3017": ["3017", "奇鋐"],
+    "3324": ["3324", "雙鴻"],
+    "3661": ["3661", "世芯"],
+    "3443": ["3443", "創意"],
+    "3035": ["3035", "智原"],
+    "5274": ["5274", "信驊"],
+    "2449": ["2449", "京元電子"],
+    "3711": ["3711", "日月光投控"],
+    "2308": ["2308", "台達電"],
+    "2345": ["2345", "智邦"],
+    "6213": ["6213", "聯茂"],
+    "2383": ["2383", "台光電"],
+    "8299": ["8299", "群聯"],
+    "2376": ["2376", "技嘉"],
+    "2357": ["2357", "華碩"],
+    "2327": ["2327", "國巨"],
+    "2492": ["2492", "華新科"],
+}
+
+STOCK_DISPLAY = {
+    "NVDA": "輝達(NVDA)",
+    "AMD": "超微(AMD)",
+    "AVGO": "博通(AVGO)",
+    "TSM": "台積電(TSM)",
+    "ASML": "ASML",
+    "MU": "美光(MU)",
+    "MRVL": "Marvell(MRVL)",
+    "ARM": "Arm(ARM)",
+    "ANET": "Arista(ANET)",
+    "SMCI": "美超微(SMCI)",
+    "MSFT": "微軟(MSFT)",
+    "GOOGL": "Alphabet(GOOGL)",
+    "AMZN": "Amazon(AMZN)",
+    "META": "Meta(META)",
+    "ORCL": "Oracle(ORCL)",
+    "PLTR": "Palantir(PLTR)",
+    "AAPL": "Apple(AAPL)",
+    "TSLA": "Tesla(TSLA)",
+    "2330": "台積電(2330)",
+    "2454": "聯發科(2454)",
+    "2382": "廣達(2382)",
+    "3231": "緯創(3231)",
+    "6669": "緯穎(6669)",
+    "2356": "英業達(2356)",
+    "2317": "鴻海(2317)",
+    "3017": "奇鋐(3017)",
+    "3324": "雙鴻(3324)",
+    "3661": "世芯(3661)",
+    "3443": "創意(3443)",
+    "3035": "智原(3035)",
+    "5274": "信驊(5274)",
+    "2449": "京元電子(2449)",
+    "3711": "日月光投控(3711)",
+    "2308": "台達電(2308)",
+    "2345": "智邦(2345)",
+    "6213": "聯茂(6213)",
+    "2383": "台光電(2383)",
+    "8299": "群聯(8299)",
+    "2376": "技嘉(2376)",
+    "2357": "華碩(2357)",
+    "2327": "國巨(2327)",
+    "2492": "華新科(2492)",
+}
+
+
+def _body_text(it: dict) -> str:
+    text = " ".join(
+        str(it.get(k) or "")
+        for k in ("title", "headline", "raw_summary", "summary")
+    )
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"&[a-zA-Z0-9#]+;", " ", text)
+    return text
+
+
+def extract_related_stocks(text: str) -> list[str]:
+    out: list[str] = []
+    haystack = text or ""
+    haystack_lower = haystack.lower()
+    for symbol, aliases in STOCK_ALIASES.items():
+        for alias in aliases:
+            if re.search(r"[A-Za-z0-9]", alias):
+                if re.search(rf"(?<![A-Za-z0-9]){re.escape(alias)}(?![A-Za-z0-9])", haystack, re.I):
+                    out.append(symbol)
+                    break
+            elif alias.lower() in haystack_lower:
+                out.append(symbol)
+                break
+    # Prefer Taiwan common stock code over ADR ticker when the same company is named in Chinese copy.
+    if "2330" in out and "TSM" in out:
+        out.remove("TSM")
+    return [STOCK_DISPLAY.get(x, x) for x in out[:6]]
+
+
+def ai_relevance(it: dict) -> int:
+    text = _body_text(it).lower()
+    score = 0
+    for kw in AI_KEYWORDS:
+        if kw.lower() in text:
+            score += 3 if kw.lower() in {"ai", "人工智慧", "算力", "gpu", "hbm", "資料中心", "伺服器"} else 2
+    score += min(len(extract_related_stocks(_body_text(it))), 4)
+    if "aggregated" in (it.get("tags") or []):
+        score += 1
+    return score
+
+
 def pick(items, n=8):
     def key(it):
         p = it.get("published_at") or ""
         w = it.get("weight") or 0
-        return (p, w)
+        return (ai_relevance(it), p, w)
 
-    return sorted(items, key=key, reverse=True)[:n]
+    ranked = sorted(items, key=key, reverse=True)
+    ai_ranked = [it for it in ranked if ai_relevance(it) > 0]
+    return (ai_ranked or ranked)[:n]
 
 
 def _title_tokens(title: str) -> set[str]:
@@ -123,33 +268,13 @@ def merge_similar_items(items: list[dict], threshold: float = 0.55) -> list[dict
     return out
 
 
-def extract_numbers(text: str):
-    if not text:
-        return []
-    nums = re.findall(
-        r"[-+]?\d+(?:\.\d+)?%|[-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?",
-        text,
-    )
-    out = []
-    for x in nums:
-        if x not in out:
-            out.append(x)
-    return out[:4]
-
-
-def one_line(s: str, limit: int = 90) -> str:
-    s = (s or "").replace("\u3000", " ").strip().split("\n")[0].strip()
-    if len(s) > limit:
-        s = s[:limit] + "…"
-    return s
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
     ap.add_argument("--tz", default="Asia/Taipei")
     ap.add_argument("--max-tw", type=int, default=8)
     ap.add_argument("--max-global", type=int, default=8)
+    ap.add_argument("--show-errors", action="store_true")
     args = ap.parse_args()
 
     j = json.load(open(args.input, "r", encoding="utf-8"))
@@ -166,51 +291,28 @@ def main() -> None:
 
     now = datetime.now(ZoneInfo(args.tz)).strftime("%Y/%m/%d %H:%M")
 
-    print(f"【財經新聞快報｜台灣＋國際】{now}（回顧近 5 小時｜RSS 去重）\n")
+    print(f"【財經新聞快報｜AI 優先】{now}（回顧近 5 小時｜RSS 去重）\n")
 
     def render_item(i: int, it: dict) -> None:
         title = (it.get("title") or it.get("headline") or "").strip()
-        summ = one_line(it.get("raw_summary") or it.get("summary") or "")
-        nums = extract_numbers(title + " " + summ)
-        numtxt = ("；關鍵數字：" + ", ".join(nums)) if nums else ""
-
-        print(f"{i}) **{title}**")
-        print(f"- 重點：{summ if summ else '（摘要缺）'}{numtxt}")
-        print(f"- 原文：[link]({it.get('link')})｜來源：{it.get('source')}")
-
-        extras = []
-        if it.get("alt_sources"):
-            extras.append("其他來源：" + " / ".join(it.get("alt_sources") or []))
-        if it.get("alt_links"):
-            extras.append("延伸閱讀：" + " ".join([f"[link]({u})" for u in (it.get("alt_links") or [])[:5]]))
-        if extras:
-            print("- " + "｜".join(extras))
-
+        stocks = extract_related_stocks(_body_text(it))
+        stock_txt = f"（相關股票：{', '.join(stocks)}）" if stocks else ""
+        print(f"{i}) **{title}**{stock_txt}")
+        print(f"- 原文：{it.get('link')}")
         print("")
 
-    print("## 台灣（最多 8 則）")
+    print(f"## 台灣（最多 {args.max_tw} 則）")
     for i, it in enumerate(tw, 1):
         render_item(i, it)
 
-    print("## 國際（最多 8 則）")
+    print(f"## 國際（最多 {args.max_global} 則）")
     for i, it in enumerate(gl, 1):
         render_item(i, it)
-
-    print("---")
-    print("### 今日主軸（3 點）")
-    print("- AI/科技股估值與資本支出（CAPEX）敘事持續牽動風險偏好。")
-    print("- 油價/地緣風險與利率路徑預期，仍是宏觀擾動來源。")
-    print("- 低軌衛星＋光通訊/雷射（矽光子/CPO）相關新聞若出現，優先追蹤。")
-
-    print("\n### 需要追蹤的事件（3 點）")
-    print("- 重大財報/法說：指引是否下修或資本支出是否轉向。")
-    print("- 美債殖利率/美元：是否出現方向性波動（影響成長股估值）。")
-    print("- 產業題材：低軌衛星與光通訊鏈的訂單/投資/供應瓶頸訊號。")
 
     errs = []
     errs.extend((regions.get("taiwan") or {}).get("errors") or [])
     errs.extend((regions.get("global") or {}).get("errors") or [])
-    if errs:
+    if args.show_errors and errs:
         print("\n### 資料來源狀態")
         for e in errs[:10]:
             print(f"- {e.get('source')}: {e.get('error')}")

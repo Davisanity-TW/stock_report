@@ -33,14 +33,14 @@ taiwan:
         type: rss
         url: https://feeds.feedburner.com/rsscna/finance
         language: zh-TW
-        weight: 1.0
+        weight: 0.7
         tags: [taiwan, finance, macro]
       - id: cna_stock
         name: 中央社－證券
         type: rss
         url: https://feeds.feedburner.com/rsscna/finance
         language: zh-TW
-        weight: 1.0
+        weight: 0.7
         tags: [taiwan, stocks, equities]
   tier2_supplement:
     description: "Supplementary Taiwan news via aggregation"
@@ -50,23 +50,23 @@ taiwan:
         type: rss
         url: https://tw.stock.yahoo.com/rss?category=tw-market
         language: zh-TW
-        weight: 0.9
+        weight: 0.8
         tags: [taiwan, stocks, yahoo]
       - id: yahoo_stock_news
         name: Yahoo股市 RSS－最新新聞
         type: rss
         url: https://tw.stock.yahoo.com/rss?category=news
         language: zh-TW
-        weight: 0.7
+        weight: 0.8
         tags: [taiwan, finance, yahoo]
       - id: google_news_tw_markets
-        name: Google News Taiwan Markets
+        name: Google News Taiwan AI Markets
         type: rss
-        query: "台股 OR 台灣 股市 OR 匯率 OR 美元 OR 台幣 OR 利率 OR 殖利率 OR 公債 OR 國債 OR 金價 OR 黃金 OR 銀價 OR 白銀 OR 比特幣 OR BTC OR 低軌衛星 OR 衛星通訊 OR Starlink OR Kuiper OR OneWeb OR 光通訊 OR 雷射 OR 矽光子 OR CPO OR 光模組 OR 光收發"
+        query: "AI OR 人工智慧 OR 生成式AI OR 算力 OR GPU OR HBM OR AI伺服器 OR 資料中心 OR 半導體 OR 晶片 OR 先進封裝 OR CoWoS OR ASIC OR 矽光子 OR CPO OR 光通訊 OR 機器人 台股 OR 台積電 OR 聯發科 OR 廣達 OR 緯創 OR 緯穎 OR 鴻海 OR 奇鋐 OR 雙鴻 OR 世芯"
         url_template: "https://news.google.com/rss/search?q={query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         language: zh-TW
-        weight: 0.6
-        tags: [taiwan, aggregated]
+        weight: 1.2
+        tags: [taiwan, aggregated, ai]
 
 # =========================
 # Global Financial News
@@ -80,26 +80,26 @@ global_markets:
         type: rss
         url: https://www.reuters.com/rssFeed/globalMarketsNews
         language: en
-        weight: 1.0
+        weight: 0.7
         tags: [global, markets, macro]
       - id: nikkei_asia
         name: Nikkei Asia
         type: rss
         url: https://asia.nikkei.com/rss/feed/nar
         language: en
-        weight: 0.9
+        weight: 0.7
         tags: [asia, markets, equities]
   tier2_supplement:
     description: "Broad global coverage via aggregation"
     sources:
       - id: google_news_global_markets
-        name: Google News Global Markets
+        name: Google News Global AI Markets
         type: rss
-        query: "markets OR stocks OR bonds OR inflation OR Fed OR oil OR gold OR silver OR bitcoin OR BTC OR FX OR currency OR USD OR TWD OR yields OR rates OR treasury OR satellite communications OR LEO satellite OR Starlink OR Project Kuiper OR OneWeb OR AST SpaceMobile OR optical communications OR photonics OR laser OR silicon photonics OR co-packaged optics OR CPO OR transceiver"
+        query: "AI OR artificial intelligence OR generative AI OR GPU OR HBM OR data center OR AI server OR semiconductor OR chips OR accelerator OR ASIC OR silicon photonics OR CPO OR inference OR robotics OR Nvidia OR AMD OR Broadcom OR Microsoft OR OpenAI OR Google OR Amazon OR Meta OR TSMC"
         url_template: "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
         language: en
-        weight: 0.6
-        tags: [global, aggregated]
+        weight: 1.2
+        tags: [global, aggregated, ai]
 
 # =========================
 # Optional API-based Sources
@@ -138,12 +138,7 @@ output:
     global: 8
   fields:
     - headline
-    - one_line_summary
     - key_entities
-    - key_numbers
-    - potential_impact
-    - source
     - link
   final_sections:
-    - daily_key_themes
-    - events_to_watch
+    - title_and_link
