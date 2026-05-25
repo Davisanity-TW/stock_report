@@ -67,6 +67,14 @@ taiwan:
         language: zh-TW
         weight: 1.2
         tags: [taiwan, aggregated, ai]
+      - id: google_news_tw_stock_market
+        name: Google News Taiwan Stock Market
+        type: rss
+        query: "台股 OR 台灣股市 OR 加權指數 OR 櫃買 OR 三大法人 OR 外資 買超 OR 半導體 權值股 OR AI概念股 OR 法說 OR 營收 台積電 OR 聯發科 OR 鴻海 OR 廣達 OR 緯創 OR 緯穎 OR 台達電"
+        url_template: "https://news.google.com/rss/search?q={query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        language: zh-TW
+        weight: 1.0
+        tags: [taiwan, aggregated, stocks]
 
 # =========================
 # Global Financial News

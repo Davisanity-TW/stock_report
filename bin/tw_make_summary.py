@@ -15,7 +15,10 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import sys
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -34,6 +37,21 @@ def _fmt_num(x):
     if x is None:
         return "NA"
     return str(x)
+
+
+def _to_float_maybe(x):
+    try:
+        if x is None:
+            return None
+        if isinstance(x, (int, float)):
+            return float(x)
+        s = str(x).strip().replace(",", "")
+        s = re.sub(r"<[^>]+>", "", s)
+        if s in {"", "-", "--", "NA", "N/A"}:
+            return None
+        return float(s)
+    except Exception:
+        return None
 
 
 def _weekday_en(date_str: str) -> str:
@@ -86,19 +104,218 @@ def _sum_inst(data: dict, key: str):
     return total if ok else None
 
 
+TW_NEWS_KEYWORDS = [
+    "台股", "台灣股市", "上市", "上櫃", "加權指數", "櫃買", "集中市場", "權值股",
+    "半導體", "電子股", "AI", "人工智慧", "伺服器", "先進封裝", "CoWoS", "ASIC",
+    "PCB", "CCL", "散熱", "光通訊", "矽光子", "CPO", "記憶體", "被動元件", "法說",
+    "營收", "財報", "外資", "投信", "自營商", "三大法人", "買超", "賣超", "目標價",
+]
+
+TW_NEWS_BLOCKLIST = [
+    "發票", "長照", "土地公告", "地上權", "三陰性乳癌", "核談判", "荷姆茲", "日本股市",
+]
+
+
+def _news_score(it: dict) -> int:
+    text = " ".join(str(it.get(k) or "") for k in ("title", "raw_summary", "source", "source_id"))
+    score = 0
+    for kw in TW_NEWS_KEYWORDS:
+        if kw.lower() in text.lower():
+            score += 2
+    if re.search(r"\b\d{4}\b", text):
+        score += 2
+    source_id = str(it.get("source_id") or "")
+    if "tw_market" in source_id:
+        score += 4
+    if "google_news_tw" in source_id:
+        score += 3
+    if "cna" in source_id:
+        score += 2
+    for bad in TW_NEWS_BLOCKLIST:
+        if bad in text:
+            score -= 5
+    if "公告" in text and not any(k in text for k in ("法說", "營收", "財報", "股利", "併購", "投資", "擴廠")):
+        score -= 3
+    return score
+
+
+def _news_norm_title(title: str) -> str:
+    t = re.sub(r"\s+", "", title or "").lower()
+    t = re.split(r"[-｜|－]", t)[0]
+    t = re.sub(r"[^\w\u4e00-\u9fff]", "", t)
+    return t[:36]
+
+
 def _pick_tw_news(news: dict, limit: int = 6):
     items = (((news.get("regions") or {}).get("taiwan") or {}).get("items") or [])
     out = []
-    for it in items:
+    seen_titles: set[str] = set()
+    ranked = sorted(items, key=lambda it: (_news_score(it), it.get("published_at") or ""), reverse=True)
+    for it in ranked:
         title = (it.get("title") or "").strip()
         link = (it.get("link") or "").strip()
         source = (it.get("source") or "").strip()
         if not title or not link:
             continue
+        nt = _news_norm_title(title)
+        if nt and nt in seen_titles:
+            continue
+        if _news_score(it) <= 0 and out:
+            continue
         out.append((title, link, source))
+        if nt:
+            seen_titles.add(nt)
         if len(out) >= limit:
             break
     return out
+
+
+def _http_json(url: str, timeout: int = 25):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; stock_report/1.0)"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _roc_compact(gdate: dt.date) -> str:
+    return f"{gdate.year - 1911:03d}{gdate.month:02d}{gdate.day:02d}"
+
+
+def _twse_mi_index(gdate: dt.date) -> dict:
+    url = "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?" + urllib.parse.urlencode(
+        {"date": gdate.strftime("%Y%m%d"), "type": "ALLBUT0999", "response": "json"}
+    )
+    return _http_json(url)
+
+
+def _parse_twse_quotes(mi: dict) -> dict[str, dict]:
+    quotes: dict[str, dict] = {}
+    tables = mi.get("tables") or []
+    for table in tables:
+        fields = table.get("fields") or []
+        if not fields or fields[0] != "證券代號":
+            continue
+        idx = {name: i for i, name in enumerate(fields)}
+        for row in table.get("data") or []:
+            if not isinstance(row, list) or len(row) < len(fields):
+                continue
+            code = str(row[idx.get("證券代號", 0)]).strip()
+            if not re.fullmatch(r"\d{4}", code):
+                continue
+            close = _to_float_maybe(row[idx.get("收盤價")])
+            chg = _to_float_maybe(row[idx.get("漲跌價差")])
+            vol = _to_float_maybe(row[idx.get("成交股數")])
+            if close is None or chg is None:
+                continue
+            prev = close - chg
+            pct = (chg / prev * 100.0) if prev else 0.0
+            quotes[code] = {
+                "code": code,
+                "name": str(row[idx.get("證券名稱", 1)]).strip().rstrip("*"),
+                "pct": pct,
+                "volume_lots": int(round((vol or 0) / 1000.0)),
+                "market": "TWSE",
+            }
+    return quotes
+
+
+def _parse_twse_sector_indices(mi: dict) -> list[tuple[str, float]]:
+    rows: list[tuple[str, float]] = []
+    for table in (mi.get("tables") or [])[:2]:
+        fields = table.get("fields") or []
+        if not fields or fields[0] != "指數":
+            continue
+        idx_name = fields.index("指數")
+        idx_pct = fields.index("漲跌百分比(%)") if "漲跌百分比(%)" in fields else None
+        if idx_pct is None:
+            continue
+        for row in table.get("data") or []:
+            if not isinstance(row, list) or len(row) <= idx_pct:
+                continue
+            name = str(row[idx_name]).strip()
+            if "類指數" not in name:
+                continue
+            pct = _to_float_maybe(row[idx_pct])
+            if pct is None:
+                continue
+            clean = name.replace("類指數", "")
+            rows.append((clean, pct))
+    rows.sort(key=lambda x: x[1], reverse=True)
+    return rows
+
+
+def _parse_tpex_quotes(gdate: dt.date) -> dict[str, dict]:
+    rows = _http_json("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes")
+    target = _roc_compact(gdate)
+    out: dict[str, dict] = {}
+    for row in rows:
+        if row.get("Date") != target:
+            continue
+        code = str(row.get("SecuritiesCompanyCode") or "").strip()
+        if not re.fullmatch(r"\d{4}", code):
+            continue
+        close = _to_float_maybe(row.get("Close"))
+        chg = _to_float_maybe(row.get("Change"))
+        vol = _to_float_maybe(row.get("TradingShares"))
+        if close is None or chg is None:
+            continue
+        prev = close - chg
+        pct = (chg / prev * 100.0) if prev else 0.0
+        out[code] = {
+            "code": code,
+            "name": str(row.get("CompanyName") or "").strip().rstrip("*"),
+            "pct": pct,
+            "volume_lots": int(round((vol or 0) / 1000.0)),
+            "market": "TPEX",
+        }
+    return out
+
+
+THEME_BASKETS = {
+    "AI伺服器/ODM": ["2382", "3231", "6669", "2356", "2317", "2376", "2357"],
+    "散熱/機殼": ["3017", "3324", "3653", "6230", "8210", "8996", "3338"],
+    "光通訊/CPO": ["4979", "3163", "3363", "3234", "3081", "6442", "3450", "4908", "8011"],
+    "半導體/ASIC/封測": ["2330", "2454", "3661", "3443", "3035", "5274", "2449", "3711", "3264"],
+    "記憶體/儲存": ["2344", "2408", "2337", "8299", "6770", "3260"],
+    "PCB/CCL": ["2383", "2368", "6274", "6213", "3037", "4958", "3044"],
+    "電源/被動元件": ["2308", "2327", "2492", "6173", "6284", "6449"],
+    "網通/交換器": ["2345", "6285", "5388", "3596", "4906", "2412"],
+}
+
+
+def _theme_rotation(day: str) -> tuple[list[str], list[str]]:
+    try:
+        gdate = dt.date.fromisoformat(day)
+        mi = _twse_mi_index(gdate)
+        quotes = _parse_twse_quotes(mi)
+        quotes.update(_parse_tpex_quotes(gdate))
+        sectors = _parse_twse_sector_indices(mi)
+    except Exception as e:
+        return [f"- 公開行情抓取失敗：{e}"], []
+
+    sector_lines = []
+    if sectors:
+        top = "、".join(f"{name} {pct:+.2f}%" for name, pct in sectors[:5])
+        weak = "、".join(f"{name} {pct:+.2f}%" for name, pct in sectors[-3:])
+        sector_lines.append(f"- TWSE 類股指數強勢：{top}。")
+        sector_lines.append(f"- TWSE 類股指數落後：{weak}。")
+
+    theme_rows = []
+    for theme, codes in THEME_BASKETS.items():
+        members = [quotes[c] for c in codes if c in quotes and isinstance(quotes[c].get("pct"), (int, float))]
+        if len(members) < 2:
+            continue
+        avg = sum(m["pct"] for m in members) / len(members)
+        adv = sum(1 for m in members if m["pct"] > 0)
+        reps = sorted(members, key=lambda m: (m["pct"], m.get("volume_lots") or 0), reverse=True)[:3]
+        rep_txt = "、".join(f"{m['name']}({m['code']}) {m['pct']:+.2f}%" for m in reps)
+        theme_rows.append((avg, adv, len(members), theme, rep_txt))
+    theme_rows.sort(reverse=True, key=lambda x: (x[0], x[1] / x[2]))
+
+    theme_lines = [
+        f"- {theme}：平均 {avg:+.2f}%，上漲 {adv}/{total}；代表：{rep_txt}"
+        for avg, adv, total, theme, rep_txt in theme_rows[:5]
+    ]
+    return sector_lines, theme_lines
 
 
 def main():
@@ -120,19 +337,6 @@ def main():
     # We support two cache formats:
     # (A) flattened: {close, change, change_pct}
     # (B) raw wrapper: {data:{fields:[...], data:[[...], ...]}} from TWSE FMTQIK
-
-    def _to_float_maybe(x):
-        try:
-            if x is None:
-                return None
-            if isinstance(x, (int, float)):
-                return float(x)
-            s = str(x).strip().replace(",", "")
-            if s in {"", "-", "--", "NA", "N/A"}:
-                return None
-            return float(s)
-        except Exception:
-            return None
 
     def _roc_date_str(gdate: dt.date) -> str:
         roc_year = gdate.year - 1911
@@ -246,7 +450,7 @@ def main():
         if picked:
             for title, link, source in picked:
                 sfx = f"（{source}）" if source else ""
-                news_block.append(f"- {title}{sfx}\n  - {link}")
+                news_block.append(f"- {title}{sfx} [link]({link})")
 
     if not news_block:
         news_block = [
@@ -256,6 +460,8 @@ def main():
             "  - TPEx 上櫃收盤行情：https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
             "  - TPEx 三大法人：https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading",
         ]
+
+    sector_lines, theme_lines = _theme_rotation(day)
 
     # Potential strength list: take top movers among items that have change_pct
     # Minimal mapping for names (fallback)
@@ -336,8 +542,13 @@ def main():
         md.append("- （資料不足：清單內缺乏完整量價/法人資訊，暫不做轉強篩選。）")
 
     md.append("")
-    md.append("### E) 族群輪動觀察（點名：低軌衛星、光通訊/雷射)")
-    md.append("- 低軌衛星/光通訊：以『多檔同步走強 + 量能擴散』判定輪動是否成立；若僅單檔拉抬，續航風險較高。")
+    md.append("### E) 族群輪動觀察（公開行情計算）")
+    md.extend(sector_lines or ["- TWSE 類股指數：資料不足。"])
+    if theme_lines:
+        md.append("- 主題籃子強弱（TWSE/TPEx 收盤行情；等權平均）：")
+        md.extend([f"  {line}" for line in theme_lines])
+    else:
+        md.append("- 主題籃子：資料不足。")
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
