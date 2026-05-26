@@ -239,12 +239,15 @@ def pick_ai_first(items, n=8):
     return (ai_ranked or ranked)[:n]
 
 
-def pick_taiwan_non_ai(items, n=8):
-    """Prefer Taiwan market news that is less directly tied to AI.
+def pick_taiwan_ai_then_finance(items, n=8, ai_slots=5):
+    """Pick Taiwan stories with AI first, then broader finance.
 
-    The digest is still allowed to include AI-related Taiwan stories when the
-    recent window does not have enough non-AI market news, but they should not
-    dominate the Taiwan section.
+    Target layout:
+    - 1-5: AI / semiconductor / data-center / related supply-chain stories
+    - 6-8: other market, macro, financial, ETF, FX, energy, or industry news
+
+    If the recent window lacks enough items in either bucket, fill from the
+    remaining market-relevant stories so the digest still stays useful.
     """
 
     def recency_key(it):
@@ -252,14 +255,31 @@ def pick_taiwan_non_ai(items, n=8):
 
     market_items = [it for it in items if taiwan_market_relevance(it) > 0]
     ranked = sorted(market_items or items, key=recency_key, reverse=True)
-    low_ai = [it for it in ranked if ai_relevance(it) == 0]
-    weak_ai = [it for it in ranked if 0 < ai_relevance(it) <= 2]
-    ai_related = sorted(
-        [it for it in ranked if ai_relevance(it) > 2],
+    ai_ranked = sorted(
+        [it for it in ranked if ai_relevance(it) > 0],
         key=lambda it: (ai_relevance(it), it.get("published_at") or "", it.get("weight") or 0),
+        reverse=True,
     )
+    non_ai_ranked = [it for it in ranked if ai_relevance(it) == 0]
 
-    picked = (low_ai + weak_ai + ai_related)[:n]
+    picked = ai_ranked[: min(ai_slots, n)]
+    seen = {id(it) for it in picked}
+
+    for it in non_ai_ranked:
+        if len(picked) >= n:
+            break
+        if id(it) not in seen:
+            picked.append(it)
+            seen.add(id(it))
+
+    # Fallback: if one bucket is short, fill from the rest without duplicating.
+    for it in ranked:
+        if len(picked) >= n:
+            break
+        if id(it) not in seen:
+            picked.append(it)
+            seen.add(id(it))
+
     return picked
 
 
@@ -385,7 +405,7 @@ def main() -> None:
     tw_items = merge_similar_items(tw_items)
     gl_items = merge_similar_items(gl_items)
 
-    tw = pick_taiwan_non_ai(tw_items, args.max_tw)
+    tw = pick_taiwan_ai_then_finance(tw_items, args.max_tw)
     gl = pick_ai_first(gl_items, args.max_global)
 
     now = datetime.now(ZoneInfo(args.tz)).strftime("%Y/%m/%d %H:%M")
