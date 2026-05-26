@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from difflib import SequenceMatcher
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -32,6 +33,25 @@ AI_KEYWORDS = [
     "人工智慧", "生成式ai", "生成式 ai", "ai代理", "ai 代理", "算力", "資料中心",
     "數據中心", "伺服器", "半導體", "晶片", "先進封裝", "矽光子", "光通訊",
     "推論", "訓練", "機器人", "輝達", "黃仁勳",
+]
+
+TAIWAN_MARKET_KEYWORDS = [
+    "台股", "台灣股市", "加權指數", "櫃買", "上市", "上櫃", "權值股",
+    "股票", "股市", "股價", "股東會", "買超", "賣超", "外資", "三大法人",
+    "etf", "基金", "投信", "券商", "金管會", "銀行", "金控", "保險", "壽險",
+    "匯率", "新台幣", "美元", "利率", "升息", "降息", "央行", "聯準會",
+    "通膨", "cpi", "殖利率", "美債", "債券", "期貨", "原油", "油價",
+    "能源", "電力", "電價", "經濟", "景氣", "產業", "營收", "獲利",
+    "財報", "法說", "併購", "投資", "市場", "供應鏈", "半導體", "電子股",
+    "金融股", "航運股", "觀光股", "傳產", "證券", "有價證券", "資金", "華爾街",
+    "企業", "商會", "台積電", "聯發科", "鴻海", "台達電",
+    "markets", "market", "stocks", "stock", "equities", "inflation", "rate",
+    "yield", "oil", "energy", "earnings", "revenue", "economy", "investment",
+]
+
+TAIWAN_OFF_TOPIC_KEYWORDS = [
+    "頭獎", "今彩", "大樂透", "威力彩", "彩券", "mlb", "nba", "中職",
+    "棒球", "籃球", "機油", "引擎", "熱浪", "氣溫", "公共衛生",
 ]
 
 STOCK_ALIASES = {
@@ -186,7 +206,29 @@ def ai_relevance(it: dict) -> int:
     return score
 
 
-def pick(items, n=8):
+def taiwan_market_relevance(it: dict) -> int:
+    text = _body_text(it).lower()
+    title = str(it.get("title") or it.get("headline") or "").lower()
+    score = 0
+
+    for kw in TAIWAN_MARKET_KEYWORDS:
+        if kw.lower() in text:
+            score += 2 if kw in {"台股", "台灣股市", "加權指數", "櫃買", "金管會", "匯率", "新台幣"} else 1
+
+    stocks = extract_related_stocks(_body_text(it))
+    score += min(len(stocks) * 2, 6)
+
+    tags = set(it.get("tags") or [])
+    if score > 0 and tags & {"finance", "stocks", "equities", "macro"}:
+        score += 1
+
+    if any(kw.lower() in title for kw in TAIWAN_OFF_TOPIC_KEYWORDS):
+        score -= 8
+
+    return score
+
+
+def pick_ai_first(items, n=8):
     def key(it):
         p = it.get("published_at") or ""
         w = it.get("weight") or 0
@@ -195,6 +237,30 @@ def pick(items, n=8):
     ranked = sorted(items, key=key, reverse=True)
     ai_ranked = [it for it in ranked if ai_relevance(it) > 0]
     return (ai_ranked or ranked)[:n]
+
+
+def pick_taiwan_non_ai(items, n=8):
+    """Prefer Taiwan market news that is less directly tied to AI.
+
+    The digest is still allowed to include AI-related Taiwan stories when the
+    recent window does not have enough non-AI market news, but they should not
+    dominate the Taiwan section.
+    """
+
+    def recency_key(it):
+        return (it.get("published_at") or "", it.get("weight") or 0)
+
+    market_items = [it for it in items if taiwan_market_relevance(it) > 0]
+    ranked = sorted(market_items or items, key=recency_key, reverse=True)
+    low_ai = [it for it in ranked if ai_relevance(it) == 0]
+    weak_ai = [it for it in ranked if 0 < ai_relevance(it) <= 2]
+    ai_related = sorted(
+        [it for it in ranked if ai_relevance(it) > 2],
+        key=lambda it: (ai_relevance(it), it.get("published_at") or "", it.get("weight") or 0),
+    )
+
+    picked = (low_ai + weak_ai + ai_related)[:n]
+    return picked
 
 
 def _title_tokens(title: str) -> set[str]:
@@ -221,6 +287,17 @@ def _set_sim(a: set[str], b: set[str]) -> float:
     if not a or not b:
         return 0.0
     return len(a & b) / len(a | b)
+
+
+def _title_text_sim(a: str, b: str) -> float:
+    a2 = re.sub(r"\s+", "", (a or "").lower())
+    b2 = re.sub(r"\s+", "", (b or "").lower())
+    for boilerplate in ("【", "】", "(", ")", "（", "）", "公告", "本公司"):
+        a2 = a2.replace(boilerplate, "")
+        b2 = b2.replace(boilerplate, "")
+    if not a2 or not b2:
+        return 0.0
+    return SequenceMatcher(None, a2, b2).ratio()
 
 
 KEY_PAIRS = [
@@ -254,13 +331,16 @@ def merge_similar_items(items: list[dict], threshold: float = 0.55) -> list[dict
             rep_title = (rep.get("title") or rep.get("headline") or "").strip()
             rep_toks = rep.setdefault("_title_tokens", _title_tokens(rep_title))
             sim = _set_sim(toks, rep_toks)
+            text_sim = _title_text_sim(title, rep_title)
             inter = toks & rep_toks
 
             strong_entity_match = any(pair.issubset(inter) for pair in KEY_PAIRS)
 
             # Merge when we have enough shared "entity" tokens.
             # - Either overall token overlap is decent, OR we detect a strong entity pair match.
-            if len(inter) >= 2 and (sim >= threshold or strong_entity_match):
+            # - CJK titles often do not produce useful ascii tokens, so also use
+            #   a conservative full-title similarity check.
+            if (len(inter) >= 2 and (sim >= threshold or strong_entity_match)) or text_sim >= 0.78:
                 # merge links
                 rep.setdefault("alt_links", [])
                 link = it.get("link")
@@ -305,8 +385,8 @@ def main() -> None:
     tw_items = merge_similar_items(tw_items)
     gl_items = merge_similar_items(gl_items)
 
-    tw = pick(tw_items, args.max_tw)
-    gl = pick(gl_items, args.max_global)
+    tw = pick_taiwan_non_ai(tw_items, args.max_tw)
+    gl = pick_ai_first(gl_items, args.max_global)
 
     now = datetime.now(ZoneInfo(args.tz)).strftime("%Y/%m/%d %H:%M")
 
