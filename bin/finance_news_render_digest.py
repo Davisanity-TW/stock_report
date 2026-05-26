@@ -124,6 +124,18 @@ STOCK_DISPLAY = {
     "2492": "華新科(2492)",
 }
 
+GLOBAL_TITLE_TRANSLATIONS = {
+    "AMD, Broadcom and Google Intensify Anti-Nvidia Offensive as AI Semiconductor Landscape Faces Potential Realignment - economy.ac": "AMD、博通與 Google 加強反輝達攻勢，AI 半導體版圖可能重新洗牌",
+    "Marvell on the Eve of Earnings: Wall Street Collectively Raises Price Targets, Can Nvidia and AMD’s Double Endorsement Deliver on the AI Narrative? - TradingKey": "Marvell 財報前夕華爾街同步調高目標價，輝達與 AMD 雙重背書能否支撐 AI 題材？",
+    "Here's What I Think Is Going on With Nvidia Stock After the AI Giant's Showstopping Earnings Report - The Motley Fool": "AI 巨頭交出亮眼財報後，輝達股價接下來可能怎麼走",
+    "NVIDIA Corporation stock (US67066G1040): record AI earnings keep attention high - AD HOC NEWS": "輝達創紀錄 AI 財報讓市場關注度維持高檔",
+    "Infineon Showcases Semiconductor Solutions at PCIM Europe ’26 - Bisinfotech": "英飛凌於 PCIM Europe 2026 展示半導體解決方案",
+    "The 3-Stock Custom Silicon Basket That Could Outperform Nvidia by 2030 - The Globe and Mail": "2030 年前可能跑贏輝達的 3 檔客製化晶片組合",
+    "Singapore pressed to adopt AI-led checks after Nvidia case - Singapore Business Review": "輝達事件後，新加坡被要求採用 AI 主導審查",
+    "The 'Next Nvidia' Trade? Why Investors Are Suddenly Watching Advanced Micro Devices, Arm Holdings, and Marvell Technology - Yahoo Finance": "「下一個輝達」交易？為何投資人突然關注超微、Arm 與 Marvell",
+    "The 3-Stock Custom Silicon Basket That Could Outperform Nvidia by 2030 - The Motley Fool": "2030 年前可能跑贏輝達的 3 檔客製化晶片組合",
+}
+
 
 def _body_text(it: dict) -> str:
     text = " ".join(
@@ -153,6 +165,13 @@ def extract_related_stocks(text: str) -> list[str]:
     if "2330" in out and "TSM" in out:
         out.remove("TSM")
     return [STOCK_DISPLAY.get(x, x) for x in out[:6]]
+
+
+def display_title(it: dict, region: str) -> str:
+    title = (it.get("title") or it.get("headline") or "").strip()
+    if region != "global":
+        return title
+    return (it.get("title_zh") or GLOBAL_TITLE_TRANSLATIONS.get(title) or title).strip()
 
 
 def ai_relevance(it: dict) -> int:
@@ -293,21 +312,21 @@ def main() -> None:
 
     print(f"【財經新聞快報｜AI 優先】{now}（回顧近 5 小時｜RSS 去重）\n")
 
-    def render_item(i: int, it: dict) -> None:
-        title = (it.get("title") or it.get("headline") or "").strip()
+    def render_item(i: int, it: dict, region: str) -> None:
+        title = display_title(it, region)
         stocks = extract_related_stocks(_body_text(it))
         stock_txt = f"（相關股票：{', '.join(stocks)}）" if stocks else ""
         print(f"{i}) **{title}**{stock_txt}")
-        print(f"- 原文：{it.get('link')}")
+        print(f"- 原文：[link]({it.get('link')})")
         print("")
 
     print(f"## 台灣（最多 {args.max_tw} 則）")
     for i, it in enumerate(tw, 1):
-        render_item(i, it)
+        render_item(i, it, "taiwan")
 
     print(f"## 國際（最多 {args.max_global} 則）")
     for i, it in enumerate(gl, 1):
-        render_item(i, it)
+        render_item(i, it, "global")
 
     errs = []
     errs.extend((regions.get("taiwan") or {}).get("errors") or [])
