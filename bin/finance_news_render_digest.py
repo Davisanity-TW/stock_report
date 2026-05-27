@@ -154,6 +154,11 @@ GLOBAL_TITLE_TRANSLATIONS = {
     "Singapore pressed to adopt AI-led checks after Nvidia case - Singapore Business Review": "輝達事件後，新加坡被要求採用 AI 主導審查",
     "The 'Next Nvidia' Trade? Why Investors Are Suddenly Watching Advanced Micro Devices, Arm Holdings, and Marvell Technology - Yahoo Finance": "「下一個輝達」交易？為何投資人突然關注超微、Arm 與 Marvell",
     "The 3-Stock Custom Silicon Basket That Could Outperform Nvidia by 2030 - The Motley Fool": "2030 年前可能跑贏輝達的 3 檔客製化晶片組合",
+    "China refuses to buy Nvidia’s AI chips after Trump’s tariff plan backfires - MSN": "川普關稅計畫反噬，中國拒買輝達 AI 晶片",
+    "Micron Rally Boosts Semiconductor ETFs: Top AI Funds To Watch In 2026 - Micron Technology (NASDAQ:MU), NV - Benzinga": "美光大漲帶動半導體 ETF，2026 年值得關注的 AI 基金",
+    "Nvidia Just Increased Its Holding by 95% in This AI Stock That's Climbed Nearly 50% This Year. - The Globe and Mail": "輝達增持這檔今年已漲近 50% 的 AI 股票，持股提高 95%",
+    "Nvidia Gets All the Credit, but These 4 Stocks Are Quietly Capturing the $725 Billion AI Buildout - The Motley Fool": "輝達吸走市場目光，但這 4 檔股票正默默受惠 7,250 億美元 AI 建設潮",
+    "IREN stock is already up 58% in 2026. Nvidia could keep taking shares higher. - MSN": "IREN 股價 2026 年已漲 58%，輝達題材可能續推升股價",
 }
 
 
