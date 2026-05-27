@@ -17,6 +17,7 @@ import datetime as dt
 import json
 import re
 import sys
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -171,9 +172,17 @@ def _pick_tw_news(news: dict, limit: int = 6):
 
 
 def _http_json(url: str, timeout: int = 25):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; stock_report/1.0)"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    last_exc = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; stock_report/1.0)"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            last_exc = e
+            if attempt < 2:
+                time.sleep(1 + attempt)
+    raise last_exc
 
 
 def _roc_compact(gdate: dt.date) -> str:
@@ -282,22 +291,42 @@ THEME_BASKETS = {
 }
 
 
+def _fmt_pct(pct: float) -> str:
+    return f"{pct:+.2f}%"
+
+
+def _name_pct(name: str, pct: float) -> str:
+    return f"{name}({_fmt_pct(pct)})"
+
+
 def _theme_rotation(day: str) -> tuple[list[str], list[str]]:
+    errors: list[str] = []
+    quotes: dict[str, dict] = {}
+    sectors: list[tuple[str, float]] = []
+
     try:
         gdate = dt.date.fromisoformat(day)
         mi = _twse_mi_index(gdate)
         quotes = _parse_twse_quotes(mi)
-        quotes.update(_parse_tpex_quotes(gdate))
         sectors = _parse_twse_sector_indices(mi)
     except Exception as e:
-        return [f"- 公開行情抓取失敗：{e}"], []
+        errors.append(f"TWSE 公開行情抓取失敗：{e}")
+
+    try:
+        if "gdate" not in locals():
+            gdate = dt.date.fromisoformat(day)
+        quotes.update(_parse_tpex_quotes(gdate))
+    except Exception as e:
+        errors.append(f"TPEx 公開行情抓取失敗：{e}")
 
     sector_lines = []
     if sectors:
-        top = "、".join(f"{name} {pct:+.2f}%" for name, pct in sectors[:5])
-        weak = "、".join(f"{name} {pct:+.2f}%" for name, pct in sectors[-3:])
-        sector_lines.append(f"- TWSE 類股指數強勢：{top}。")
-        sector_lines.append(f"- TWSE 類股指數落後：{weak}。")
+        top = "、".join(_name_pct(name, pct) for name, pct in sectors[:5])
+        weak = "、".join(_name_pct(name, pct) for name, pct in sorted(sectors, key=lambda x: x[1])[:3])
+        sector_lines.append(f"- 強勢類股：{top}。")
+        sector_lines.append(f"- 落後類股：{weak}。")
+    elif errors:
+        sector_lines.extend(f"- {e}" for e in errors)
 
     theme_rows = []
     for theme, codes in THEME_BASKETS.items():
@@ -311,10 +340,20 @@ def _theme_rotation(day: str) -> tuple[list[str], list[str]]:
         theme_rows.append((avg, adv, len(members), theme, rep_txt))
     theme_rows.sort(reverse=True, key=lambda x: (x[0], x[1] / x[2]))
 
-    theme_lines = [
-        f"- {theme}：平均 {avg:+.2f}%，上漲 {adv}/{total}；代表：{rep_txt}"
-        for avg, adv, total, theme, rep_txt in theme_rows[:5]
-    ]
+    theme_lines = []
+    if theme_rows:
+        theme_lines.append(
+            "- 強勢主題："
+            + "、".join(_name_pct(theme, avg) for avg, _adv, _total, theme, _rep_txt in theme_rows[:5])
+            + "。"
+        )
+        theme_lines.append("- 主題細節（等權平均；TWSE/TPEx 收盤行情）：")
+        theme_lines.extend(
+            f"  - {theme}：平均 {_fmt_pct(avg)}，上漲 {adv}/{total}；代表：{rep_txt}"
+            for avg, adv, total, theme, rep_txt in theme_rows[:5]
+        )
+    elif errors and not sector_lines:
+        theme_lines.extend(f"- {e}" for e in errors)
     return sector_lines, theme_lines
 
 
@@ -545,8 +584,7 @@ def main():
     md.append("### E) 族群輪動觀察（公開行情計算）")
     md.extend(sector_lines or ["- TWSE 類股指數：資料不足。"])
     if theme_lines:
-        md.append("- 主題籃子強弱（TWSE/TPEx 收盤行情；等權平均）：")
-        md.extend([f"  {line}" for line in theme_lines])
+        md.extend(theme_lines)
     else:
         md.append("- 主題籃子：資料不足。")
 
