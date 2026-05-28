@@ -36,7 +36,23 @@ cp tmp/us-latest.md "${BLOCK}"
 
 export GIT_TERMINAL_PROMPT=0
 
+STASH_BEFORE="$(git rev-parse -q --verify refs/stash 2>/dev/null || true)"
 git stash push -u -m "autostash before US weekly pull" >/dev/null 2>&1 || true
+STASH_AFTER="$(git rev-parse -q --verify refs/stash 2>/dev/null || true)"
+RESTORE_STASH=0
+if [[ -n "${STASH_AFTER}" && "${STASH_AFTER}" != "${STASH_BEFORE}" ]]; then
+  RESTORE_STASH=1
+fi
+
+restore_stash() {
+  if [[ "${RESTORE_STASH}" == "1" ]]; then
+    git stash pop >/dev/null 2>&1 || {
+      echo "warning: failed to restore autostash; check git stash list" >&2
+    }
+  fi
+}
+trap restore_stash EXIT
+
 git pull --rebase
 
 python3 bin/similarity_gate.py --draft "${BLOCK}" --section us --top 5
