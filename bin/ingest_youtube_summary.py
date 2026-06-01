@@ -12,7 +12,7 @@ Notes:
 
 import argparse
 import datetime as dt
-import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -45,7 +45,14 @@ def main():
     ap.add_argument("--date", default=None, help="YYYY-MM-DD; default Asia/Taipei today")
     ap.add_argument("--stdin", action="store_true")
     ap.add_argument("--infile", default=None)
+    ap.add_argument(
+        "--no-sync-docs",
+        action="store_true",
+        help="Only update reports/youtube; skip docs sync and homepage generation",
+    )
     args = ap.parse_args()
+
+    repo_root = Path(__file__).resolve().parents[1]
 
     if args.date:
         d = dt.date.fromisoformat(args.date)
@@ -53,7 +60,7 @@ def main():
         d = taipei_today()
 
     week_id = iso_week_id(d)
-    out = Path("reports/youtube") / f"{week_id}.md"
+    out = repo_root / "reports" / "youtube" / f"{week_id}.md"
     ensure_week_file(out, week_id)
 
     if args.stdin:
@@ -77,7 +84,11 @@ def main():
         existing += "\n"
     out.write_text(existing + block, encoding="utf-8")
 
-    print(str(out))
+    if not args.no_sync_docs:
+        subprocess.run(["node", "bin/sync_reports.mjs"], cwd=repo_root, check=True)
+        subprocess.run(["node", "bin/generate_home.mjs"], cwd=repo_root, check=True)
+
+    print(str(out.relative_to(repo_root)))
 
 
 if __name__ == "__main__":

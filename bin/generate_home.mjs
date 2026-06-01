@@ -4,7 +4,7 @@ import { join } from 'node:path'
 function latestMdName(dir) {
   if (!existsSync(dir)) return null
   const names = readdirSync(dir)
-    .filter((f) => f.endsWith('.md'))
+    .filter((f) => f.endsWith('.md') && f !== 'index.md')
     .map((f) => f.replace(/\.md$/, ''))
     .sort()
     .reverse()
