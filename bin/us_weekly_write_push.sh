@@ -32,7 +32,10 @@ PY
 )"
 WFILE="reports/us/${WEEK}.md"
 BLOCK="/tmp/us-daily-block-${DATE}.md"
-cp tmp/us-latest.md "${BLOCK}"
+{
+  printf '## %s\n\n' "${DATE}"
+  cat tmp/us-latest.md
+} > "${BLOCK}"
 
 export GIT_TERMINAL_PROMPT=0
 
