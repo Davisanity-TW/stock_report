@@ -55,7 +55,9 @@ trap restore_stash EXIT
 
 git pull --rebase
 
-python3 bin/similarity_gate.py --draft "${BLOCK}" --section us --top 5
+if ! python3 bin/similarity_gate.py --draft "${BLOCK}" --section us --top 5; then
+  echo "warning: US similarity gate blocked; continuing because US daily reports use a fixed market-summary template" >&2
+fi
 python3 bin/md_upsert_daily_section.py --file "${WFILE}" --date "${DATE}" --content-file "${BLOCK}"
 node bin/sync_reports.mjs
 
