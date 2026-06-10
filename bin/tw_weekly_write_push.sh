@@ -36,13 +36,13 @@ if [[ ! -s tmp/tw-table.md ]]; then
   exit 2
 fi
 
-YEAR="${DATE:0:4}"
 WEEK="$(python3 - <<PY
 import datetime as dt
-print(dt.date.fromisoformat('${DATE}').isocalendar().week)
+iso = dt.date.fromisoformat('${DATE}').isocalendar()
+print(f"{iso.year}-W{iso.week:02d}")
 PY
 )"
-WFILE="reports/tw/${YEAR}-W$(printf '%02d' "${WEEK}").md"
+WFILE="reports/tw/${WEEK}.md"
 
 BLOCK="/tmp/tw-daily-block-${DATE}.md"
 cp tmp/tw-summary.md "${BLOCK}"
@@ -54,13 +54,27 @@ cp tmp/tw-summary.md "${BLOCK}"
   echo
 } >> "${BLOCK}"
 
-# Keep git ops non-interactive for cron
-export GIT_ASKPASS="${GIT_ASKPASS:-/home/ubuntu/clawd/bin/git_askpass_github.sh}"
+# Keep git ops non-interactive for cron. Let the local credential helper handle
+# auth unless a caller explicitly provides GIT_ASKPASS.
 export GIT_TERMINAL_PROMPT=0
 
 # Avoid push conflicts
+STASH_BEFORE="$(git rev-parse -q --verify refs/stash 2>/dev/null || true)"
 git stash push -u -m "autostash before TW weekly pull" >/dev/null 2>&1 || true
-"$GIT_ASKPASS" >/dev/null 2>&1 || true
+STASH_AFTER="$(git rev-parse -q --verify refs/stash 2>/dev/null || true)"
+RESTORE_STASH=0
+if [[ -n "${STASH_AFTER}" && "${STASH_AFTER}" != "${STASH_BEFORE}" ]]; then
+  RESTORE_STASH=1
+fi
+
+restore_stash() {
+  if [[ "${RESTORE_STASH}" == "1" ]]; then
+    git stash pop >/dev/null 2>&1 || {
+      echo "warning: failed to restore autostash; check git stash list" >&2
+    }
+  fi
+}
+trap restore_stash EXIT
 
 git pull --rebase
 
