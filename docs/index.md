@@ -2,10 +2,10 @@
 
 最新入口（自動更新）：
 
-- 台股（TW）：[./reports/tw/2026-W26](./reports/tw/2026-W26)
+- 台股（TW）：[./reports/tw/2026-W27](./reports/tw/2026-W27)
 - 美股（US）：[./reports/us/2026-W26](./reports/us/2026-W26)
-- YT-澔哥：[./reports/youtube/2026-W26](./reports/youtube/2026-W26)
-- 財經新聞快報：[./reports/finance_news/2026-W26](./reports/finance_news/2026-W26)
+- YT-澔哥：[./reports/youtube/2026-W27](./reports/youtube/2026-W27)
+- 財經新聞快報：[./reports/finance_news/2026-W27](./reports/finance_news/2026-W27)
 - CC股票研究工具：[./reports/analysis/2026-W17](./reports/analysis/2026-W17)
 - Moltbook：[./reports/moltbook/reports/202602/02-01](./reports/moltbook/reports/202602/02-01)
 
