@@ -2,8 +2,8 @@
 
 最新入口（自動更新）：
 
-- 台股（TW）：[./reports/tw/2026-W29](./reports/tw/2026-W29)
-- 美股（US）：[./reports/us/2026-W29](./reports/us/2026-W29)
+- 台股（TW）：[./reports/tw/2026-W30](./reports/tw/2026-W30)
+- 美股（US）：[./reports/us/2026-W30](./reports/us/2026-W30)
 - YT-澔哥：[./reports/youtube/2026-W30](./reports/youtube/2026-W30)
 - 財經新聞快報：[./reports/finance_news/2026-W30](./reports/finance_news/2026-W30)
 - CC股票研究工具：[./reports/analysis/2026-W17](./reports/analysis/2026-W17)
