@@ -4,8 +4,8 @@
 
 - 台股（TW）：[./reports/tw/2026-W32](./reports/tw/2026-W32)
 - 美股（US）：[./reports/us/2026-W32](./reports/us/2026-W32)
-- YT-澔哥：[./reports/youtube/2026-W32](./reports/youtube/2026-W32)
-- 財經新聞快報：[./reports/finance_news/2026-W32](./reports/finance_news/2026-W32)
+- YT-澔哥：[./reports/youtube/2026-W33](./reports/youtube/2026-W33)
+- 財經新聞快報：[./reports/finance_news/2026-W33](./reports/finance_news/2026-W33)
 - CC股票研究工具：[./reports/analysis/2026-W17](./reports/analysis/2026-W17)
 - Moltbook：[./reports/moltbook/reports/202602/02-01](./reports/moltbook/reports/202602/02-01)
 
