@@ -80,7 +80,7 @@ mv "${TMP_PREFIX}-daily-block.md" tmp/tw-daily-block.md
 {
   echo "【台股收盤報告｜${DAY} ${HM}】"
   echo
-  cat tmp/tw-daily-block.md
+  cat tmp/tw-summary-named.md
 } > "${TMP_PREFIX}-telegram.md"
 python3 bin/tw_md_add_names.py --in "${TMP_PREFIX}-telegram.md" --out tmp/tw-latest-named.md
 cp tmp/tw-latest-named.md tmp/tw-latest.md
