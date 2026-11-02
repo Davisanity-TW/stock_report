@@ -135,4 +135,24 @@ python3 bin/json_chunks_to_files.py \
   --out-pattern /tmp/tw_close_chunk_%02d.txt \
   --count-file /tmp/tw_close_chunk_count.txt
 
-echo "OK: TW close report done for ${DAY}; telegram chunks: $(cat /tmp/tw_close_chunk_count.txt)"
+CHUNK_COUNT="$(cat /tmp/tw_close_chunk_count.txt)"
+for ((i = 1; i <= CHUNK_COUNT; i++)); do
+  CHUNK_FILE="$(printf '/tmp/tw_close_chunk_%02d.txt' "${i}")"
+  SENT=0
+  for attempt in 1 2 3; do
+    if /opt/homebrew/bin/openclaw message send \
+      --channel telegram \
+      --target 8494991595 \
+      --message "$(cat "${CHUNK_FILE}")"; then
+      SENT=1
+      break
+    fi
+    sleep "$((attempt * 2))"
+  done
+  if [[ "${SENT}" != "1" ]]; then
+    echo "ERROR: failed to send Telegram chunk ${i} after 3 attempts" >&2
+    exit 1
+  fi
+done
+
+echo "OK: TW close report done for ${DAY}; telegram chunks: ${CHUNK_COUNT}"
